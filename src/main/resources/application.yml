@@ -1,0 +1,14 @@
+server:
+  port: 8666
+
+info:
+  app:
+    name: Bad Message Handler
+    version: 1.0
+
+management:
+  endpoints:
+    enabled-by-default: true
+  endpoint:
+    info:
+      enabled: true
