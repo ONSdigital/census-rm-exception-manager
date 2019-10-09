@@ -1,6 +1,5 @@
 package uk.gov.ons.census.exceptionmanager.model;
 
-import java.util.Map;
 import lombok.Data;
 
 @Data

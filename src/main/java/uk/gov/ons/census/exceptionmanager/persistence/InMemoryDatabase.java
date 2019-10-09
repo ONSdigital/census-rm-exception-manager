@@ -82,7 +82,9 @@ public class InMemoryDatabase {
     // TODO: Persist this to a Rabbit queue or a database so it can be replayed if necessary
     // Make damn certain this is thread safe so we don't lose anything
     synchronized (skippedMessages) {
-      List<SkippedMessage> skippedMessageList = skippedMessages.computeIfAbsent(skippedMessage.getMessageHash(), key -> new LinkedList<>());
+      List<SkippedMessage> skippedMessageList =
+          skippedMessages.computeIfAbsent(
+              skippedMessage.getMessageHash(), key -> new LinkedList<>());
       skippedMessageList.add(skippedMessage);
     }
   }

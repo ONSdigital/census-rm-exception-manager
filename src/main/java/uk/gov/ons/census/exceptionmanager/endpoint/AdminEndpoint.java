@@ -28,7 +28,8 @@ public class AdminEndpoint {
   }
 
   @GetMapping(path = "/badmessage/{messageHash}")
-  public ResponseEntity<BadMessageReport> getBadMessageDetails(@PathVariable("messageHash") String messageHash) {
+  public ResponseEntity<BadMessageReport> getBadMessageDetails(
+      @PathVariable("messageHash") String messageHash) {
     BadMessageReport badMessageReport = new BadMessageReport();
     badMessageReport.setExceptionReports(inMemoryDatabase.getSeenExceptionReports(messageHash));
     badMessageReport.setExceptionStats(inMemoryDatabase.getExceptionStats(messageHash));
