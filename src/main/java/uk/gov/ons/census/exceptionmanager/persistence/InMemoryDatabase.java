@@ -1,23 +1,27 @@
 package uk.gov.ons.census.exceptionmanager.persistence;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 import uk.gov.ons.census.exceptionmanager.model.ExceptionReport;
+import uk.gov.ons.census.exceptionmanager.model.ExceptionStats;
 import uk.gov.ons.census.exceptionmanager.model.Peek;
 import uk.gov.ons.census.exceptionmanager.model.SkippedMessage;
 
 @Component
 public class InMemoryDatabase {
-  private Set<String> seenExceptions = new HashSet<>();
+  private Map<String, ExceptionStats> seenExceptions = new HashMap<>();
   private Set<String> seenHashes = new HashSet<>();
   private Map<String, Set<ExceptionReport>> seenExceptionReports = new HashMap<>();
   private Set<String> messagesToSkip = new HashSet<>();
   private Set<String> messagesToPeek = new HashSet<>();
   private Map<String, byte[]> peekedMessages = new HashMap<>();
-  private Map<String, SkippedMessage> skippedMessages = new HashMap<>();
+  private Map<String, List<SkippedMessage>> skippedMessages = new HashMap<>();
 
   public boolean haveWeSeenThisExceptionBefore(ExceptionReport exceptionReport) {
     String messageHash = exceptionReport.getMessageHash();
@@ -30,7 +34,9 @@ public class InMemoryDatabase {
             exceptionReport.getExceptionClass(),
             exceptionReport.getExceptionMessage());
 
-    if (seenExceptions.contains(uniqueIdentifier)) {
+    if (seenExceptions.containsKey(uniqueIdentifier)) {
+      seenExceptions.get(uniqueIdentifier).getSeenCount().incrementAndGet();
+      seenExceptions.get(uniqueIdentifier).setLastSeen(Instant.now());
       return true;
     }
 
@@ -40,7 +46,7 @@ public class InMemoryDatabase {
       seenExceptionReports.put(messageHash, Set.of(exceptionReport));
     }
 
-    seenExceptions.add(uniqueIdentifier);
+    seenExceptions.put(uniqueIdentifier, new ExceptionStats());
     seenHashes.add(messageHash);
     return false;
   }
@@ -74,7 +80,11 @@ public class InMemoryDatabase {
 
   public void storeSkippedMessage(SkippedMessage skippedMessage) {
     // TODO: Persist this to a Rabbit queue or a database so it can be replayed if necessary
-    skippedMessages.put(skippedMessage.getMessageHash(), skippedMessage);
+    // Make damn certain this is thread safe so we don't lose anything
+    synchronized (skippedMessages) {
+      List<SkippedMessage> skippedMessageList = skippedMessages.computeIfAbsent(skippedMessage.getMessageHash(), key -> new LinkedList<>());
+      skippedMessageList.add(skippedMessage);
+    }
   }
 
   public byte[] getPeekedMessage(String messageHash) {
@@ -83,6 +93,20 @@ public class InMemoryDatabase {
 
   public Set<ExceptionReport> getSeenExceptionReports(String messageHash) {
     return seenExceptionReports.get(messageHash);
+  }
+
+  public ExceptionStats getExceptionStats(String messageHash) {
+    for (String uniqueIdentifier : seenExceptions.keySet()) {
+      if (uniqueIdentifier.startsWith(messageHash)) {
+        return seenExceptions.get(uniqueIdentifier);
+      }
+    }
+
+    return null;
+  }
+
+  public Map<String, List<SkippedMessage>> getSkippedMessages() {
+    return skippedMessages;
   }
 
   public void reset() {

@@ -1,12 +1,15 @@
 package uk.gov.ons.census.exceptionmanager.endpoint;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
-import uk.gov.ons.census.exceptionmanager.model.ExceptionReport;
+import uk.gov.ons.census.exceptionmanager.model.BadMessageReport;
+import uk.gov.ons.census.exceptionmanager.model.SkippedMessage;
 import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
 @RestController
@@ -25,8 +28,11 @@ public class AdminEndpoint {
   }
 
   @GetMapping(path = "/badmessage/{messageHash}")
-  public ResponseEntity<Set<ExceptionReport>> getBadMessageDetails(@PathVariable("messageHash") String messageHash) {
-    return ResponseEntity.status(HttpStatus.OK).body(inMemoryDatabase.getSeenExceptionReports(messageHash));
+  public ResponseEntity<BadMessageReport> getBadMessageDetails(@PathVariable("messageHash") String messageHash) {
+    BadMessageReport badMessageReport = new BadMessageReport();
+    badMessageReport.setExceptionReports(inMemoryDatabase.getSeenExceptionReports(messageHash));
+    badMessageReport.setExceptionStats(inMemoryDatabase.getExceptionStats(messageHash));
+    return ResponseEntity.status(HttpStatus.OK).body(badMessageReport);
   }
 
   @GetMapping(path = "/skipmessage/{messageHash}")
@@ -54,6 +60,11 @@ public class AdminEndpoint {
     }
 
     return ResponseEntity.status(HttpStatus.OK).body(new String(message));
+  }
+
+  @GetMapping(path = "/skippedmessages")
+  public ResponseEntity<Map<String, List<SkippedMessage>>> getSkippedMessages() {
+    return ResponseEntity.status(HttpStatus.OK).body(inMemoryDatabase.getSkippedMessages());
   }
 
   @GetMapping(path = "/reset")
