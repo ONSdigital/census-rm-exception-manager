@@ -30,7 +30,6 @@ public class InMemoryDatabase {
             exceptionReport.getExceptionClass(),
             exceptionReport.getExceptionMessage());
 
-
     if (seenExceptions.contains(uniqueIdentifier)) {
       return true;
     }
@@ -68,6 +67,9 @@ public class InMemoryDatabase {
 
   public void storePeekMessageReply(Peek peekReply) {
     peekedMessages.put(peekReply.getMessageHash(), peekReply.getMessagePayload());
+
+    // We don't want services to keep sending us the 'peek'ed message now we've got it
+    messagesToPeek.remove(peekReply.getMessageHash());
   }
 
   public void storeSkippedMessage(SkippedMessage skippedMessage) {

@@ -10,6 +10,8 @@ import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
 @RestController
 public class AdminEndpoint {
+  private final int PEEK_TIMEOUT = 10000; // milliseconds
+
   private final InMemoryDatabase inMemoryDatabase;
 
   public AdminEndpoint(InMemoryDatabase inMemoryDatabase) {
@@ -31,7 +33,7 @@ public class AdminEndpoint {
     inMemoryDatabase.peekMessage(messageHash);
 
     byte[] message;
-    int maxWait = 10000;
+    int maxWait = PEEK_TIMEOUT;
     while ((message = inMemoryDatabase.getPeekedMessage(messageHash)) == null) {
       try {
         Thread.sleep(1);
