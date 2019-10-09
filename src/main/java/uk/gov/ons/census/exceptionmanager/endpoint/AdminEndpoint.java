@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+import uk.gov.ons.census.exceptionmanager.model.ExceptionReport;
 import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
 @RestController
@@ -21,6 +22,11 @@ public class AdminEndpoint {
   @GetMapping(path = "/badmessages")
   public ResponseEntity<Set<String>> getBadMessages() {
     return ResponseEntity.status(HttpStatus.OK).body(inMemoryDatabase.getSeenHashes());
+  }
+
+  @GetMapping(path = "/badmessage/{messageHash}")
+  public ResponseEntity<Set<ExceptionReport>> getBadMessageDetails(@PathVariable("messageHash") String messageHash) {
+    return ResponseEntity.status(HttpStatus.OK).body(inMemoryDatabase.getSeenExceptionReports(messageHash));
   }
 
   @GetMapping(path = "/skipmessage/{messageHash}")

@@ -81,6 +81,10 @@ public class InMemoryDatabase {
     return peekedMessages.get(messageHash);
   }
 
+  public Set<ExceptionReport> getSeenExceptionReports(String messageHash) {
+    return seenExceptionReports.get(messageHash);
+  }
+
   public void reset() {
     seenExceptions.clear();
     seenHashes.clear();
