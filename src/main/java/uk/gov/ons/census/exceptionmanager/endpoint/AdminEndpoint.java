@@ -46,18 +46,16 @@ public class AdminEndpoint {
     inMemoryDatabase.peekMessage(messageHash);
 
     byte[] message;
-    int maxWait = PEEK_TIMEOUT;
     while ((message = inMemoryDatabase.getPeekedMessage(messageHash)) == null) {
       try {
-        Thread.sleep(1);
+        wait(PEEK_TIMEOUT);
       } catch (InterruptedException e) {
-        // Ignored
-      }
-
-      if (maxWait-- <= 0) {
-        // Time out and return 404
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
       }
+    }
+
+    if (message == null) {
+      return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
     }
 
     return ResponseEntity.status(HttpStatus.OK).body(new String(message));
