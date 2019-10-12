@@ -1,5 +1,8 @@
 package uk.gov.ons.census.exceptionmanager.endpoint;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.TemporalAmount;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -14,7 +17,7 @@ import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
 @RestController
 public class AdminEndpoint {
-  private final int PEEK_TIMEOUT = 10000; // milliseconds
+  private final int PEEK_TIMEOUT = 10; // seconds
 
   private final InMemoryDatabase inMemoryDatabase;
 
@@ -46,19 +49,24 @@ public class AdminEndpoint {
     inMemoryDatabase.peekMessage(messageHash);
 
     byte[] message;
+    Instant timeOutTime = Instant.now().plus(Duration.ofSeconds(PEEK_TIMEOUT));
     while ((message = inMemoryDatabase.getPeekedMessage(messageHash)) == null) {
       try {
-        wait(PEEK_TIMEOUT);
+        Thread.sleep(1);
       } catch (InterruptedException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        break;
+      }
+
+      if (Instant.now().isAfter(timeOutTime)) {
+        break;
       }
     }
 
     if (message == null) {
       return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+    } else {
+      return ResponseEntity.status(HttpStatus.OK).body(new String(message));
     }
-
-    return ResponseEntity.status(HttpStatus.OK).body(new String(message));
   }
 
   @GetMapping(path = "/skippedmessages")
