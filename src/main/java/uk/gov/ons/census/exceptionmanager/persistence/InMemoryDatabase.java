@@ -17,13 +17,13 @@ import uk.gov.ons.census.exceptionmanager.model.SkippedMessage;
 public class InMemoryDatabase {
   private Map<String, ExceptionStats> seenExceptions = new HashMap<>();
   private Set<String> seenHashes = new HashSet<>();
-  private Map<String, Set<ExceptionReport>> seenExceptionReports = new HashMap<>();
+  private Map<String, List<ExceptionReport>> seenExceptionReports = new HashMap<>();
   private Set<String> messagesToSkip = new HashSet<>();
   private Set<String> messagesToPeek = new HashSet<>();
   private Map<String, byte[]> peekedMessages = new HashMap<>();
   private Map<String, List<SkippedMessage>> skippedMessages = new HashMap<>();
 
-  public boolean haveWeSeenThisExceptionBefore(ExceptionReport exceptionReport) {
+  public synchronized boolean haveWeSeenThisExceptionBefore(ExceptionReport exceptionReport) {
     String messageHash = exceptionReport.getMessageHash();
     String uniqueIdentifier =
         String.format(
@@ -43,7 +43,9 @@ public class InMemoryDatabase {
     if (seenExceptionReports.containsKey(messageHash)) {
       seenExceptionReports.get(messageHash).add(exceptionReport);
     } else {
-      seenExceptionReports.put(messageHash, Set.of(exceptionReport));
+      List<ExceptionReport> list = new LinkedList<>();
+      list.add(exceptionReport);
+      seenExceptionReports.put(messageHash, list);
     }
 
     seenExceptions.put(uniqueIdentifier, new ExceptionStats());
@@ -71,7 +73,7 @@ public class InMemoryDatabase {
     messagesToPeek.add(messageHash);
   }
 
-  public void storePeekMessageReply(Peek peekReply) {
+  public synchronized void storePeekMessageReply(Peek peekReply) {
     peekedMessages.put(peekReply.getMessageHash(), peekReply.getMessagePayload());
 
     // We don't want services to keep sending us the 'peek'ed message now we've got it
@@ -93,7 +95,7 @@ public class InMemoryDatabase {
     return peekedMessages.get(messageHash);
   }
 
-  public Set<ExceptionReport> getSeenExceptionReports(String messageHash) {
+  public List<ExceptionReport> getSeenExceptionReports(String messageHash) {
     return seenExceptionReports.get(messageHash);
   }
 
