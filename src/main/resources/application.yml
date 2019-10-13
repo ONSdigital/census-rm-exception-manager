@@ -12,3 +12,6 @@ management:
   endpoint:
     info:
       enabled: true
+
+peek:
+  timeout: 30000 # milliseconds

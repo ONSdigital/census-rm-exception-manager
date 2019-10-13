@@ -5,21 +5,22 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import uk.gov.ons.census.exceptionmanager.model.BadMessageReport;
-import uk.gov.ons.census.exceptionmanager.model.ExceptionStats;
 import uk.gov.ons.census.exceptionmanager.model.SkippedMessage;
 import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
 @RestController
 public class AdminEndpoint {
-  private final int PEEK_TIMEOUT = 10; // seconds
-
   private final InMemoryDatabase inMemoryDatabase;
+
+  @Value("${peek.timeout}")
+  private int peekTimeout;
 
   public AdminEndpoint(InMemoryDatabase inMemoryDatabase) {
     this.inMemoryDatabase = inMemoryDatabase;
@@ -27,22 +28,14 @@ public class AdminEndpoint {
 
   @GetMapping(path = "/badmessages")
   public ResponseEntity<Set<String>> getBadMessages() {
-    return ResponseEntity.status(HttpStatus.OK).body(inMemoryDatabase.getSeenHashes());
+    return ResponseEntity.status(HttpStatus.OK).body(inMemoryDatabase.getSeenMessageHashes());
   }
 
   @GetMapping(path = "/badmessage/{messageHash}")
-  public ResponseEntity<BadMessageReport> getBadMessageDetails(
+  public ResponseEntity<List<BadMessageReport>> getBadMessageDetails(
       @PathVariable("messageHash") String messageHash) {
-    ExceptionStats aggregateExceptionStats = new ExceptionStats();
-    List<ExceptionStats> exceptionStatsList =
-        inMemoryDatabase.getExceptionStats(messageHash, aggregateExceptionStats);
-
-    BadMessageReport badMessageReport = new BadMessageReport();
-    badMessageReport.setExceptionReports(inMemoryDatabase.getSeenExceptionReports(messageHash));
-    badMessageReport.setExceptionStatsList(exceptionStatsList);
-    badMessageReport.setExceptionStats(aggregateExceptionStats);
-
-    return ResponseEntity.status(HttpStatus.OK).body(badMessageReport);
+    return ResponseEntity.status(HttpStatus.OK)
+        .body(inMemoryDatabase.getBadMessageReports(messageHash));
   }
 
   @GetMapping(path = "/skipmessage/{messageHash}")
@@ -55,12 +48,12 @@ public class AdminEndpoint {
     inMemoryDatabase.peekMessage(messageHash);
 
     byte[] message;
-    Instant timeOutTime = Instant.now().plus(Duration.ofSeconds(PEEK_TIMEOUT));
+    Instant timeOutTime = Instant.now().plus(Duration.ofMillis(peekTimeout));
     while ((message = inMemoryDatabase.getPeekedMessage(messageHash)) == null) {
       try {
         Thread.sleep(1);
       } catch (InterruptedException e) {
-        break;
+        break; // Service must be shutting down, probably
       }
 
       if (Instant.now().isAfter(timeOutTime)) {
@@ -76,8 +69,15 @@ public class AdminEndpoint {
   }
 
   @GetMapping(path = "/skippedmessages")
-  public ResponseEntity<Map<String, List<SkippedMessage>>> getSkippedMessages() {
-    return ResponseEntity.status(HttpStatus.OK).body(inMemoryDatabase.getSkippedMessages());
+  public ResponseEntity<Map<String, List<SkippedMessage>>> getAllSkippedMessages() {
+    return ResponseEntity.status(HttpStatus.OK).body(inMemoryDatabase.getAllSkippedMessages());
+  }
+
+  @GetMapping(path = "/skippedmessage/{messageHash}")
+  public ResponseEntity<List<SkippedMessage>> getSkippedMessage(
+      @PathVariable("messageHash") String messageHash) {
+    return ResponseEntity.status(HttpStatus.OK)
+        .body(inMemoryDatabase.getSkippedMessages(messageHash));
   }
 
   @GetMapping(path = "/reset")

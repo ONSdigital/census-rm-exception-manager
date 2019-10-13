@@ -24,17 +24,11 @@ public final class ReportingEndpoint {
     Response result = new Response();
     String messageHash = exceptionReport.getMessageHash();
 
-    if (inMemoryDatabase.shouldWeSkipThisMessage(messageHash)) {
-      result.setSkipIt(true);
-    } else {
-      if (inMemoryDatabase.shouldWePeekThisMessage(messageHash)) {
-        result.setPeek(true);
-      }
+    result.setSkipIt(inMemoryDatabase.shouldWeSkipThisMessage(messageHash));
+    result.setPeek(inMemoryDatabase.shouldWePeekThisMessage(messageHash));
+    result.setLogIt(inMemoryDatabase.shouldWeLogThisMessage(exceptionReport));
 
-      if (!inMemoryDatabase.haveWeSeenThisExceptionBefore(exceptionReport)) {
-        result.setLogIt(true);
-      }
-    }
+    inMemoryDatabase.updateStats(exceptionReport);
 
     return ResponseEntity.status(HttpStatus.OK).body(result);
   }

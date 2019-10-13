@@ -6,7 +6,7 @@ import lombok.Data;
 
 @Data
 public class ExceptionStats {
-  Instant firstSeen = Instant.now();
-  Instant lastSeen = Instant.now();
-  AtomicInteger seenCount = new AtomicInteger(0);
+  private Instant firstSeen = Instant.now();
+  private Instant lastSeen = Instant.now();
+  private AtomicInteger seenCount = new AtomicInteger(1);
 }
