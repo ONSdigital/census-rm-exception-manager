@@ -35,18 +35,15 @@ public class InMemoryDatabase {
             exceptionReport.getExceptionMessage());
 
     if (seenExceptions.containsKey(uniqueIdentifier)) {
-      seenExceptions.get(uniqueIdentifier).getSeenCount().incrementAndGet();
-      seenExceptions.get(uniqueIdentifier).setLastSeen(Instant.now());
+      ExceptionStats exceptionStats = seenExceptions.get(uniqueIdentifier);
+      exceptionStats.getSeenCount().incrementAndGet();
+      exceptionStats.setLastSeen(Instant.now());
       return true;
     }
 
-    if (seenExceptionReports.containsKey(messageHash)) {
-      seenExceptionReports.get(messageHash).add(exceptionReport);
-    } else {
-      List<ExceptionReport> list = new LinkedList<>();
-      list.add(exceptionReport);
-      seenExceptionReports.put(messageHash, list);
-    }
+    List<ExceptionReport> exceptionReportList =
+        seenExceptionReports.computeIfAbsent(messageHash, key -> new LinkedList<>());
+    exceptionReportList.add(exceptionReport);
 
     seenExceptions.put(uniqueIdentifier, new ExceptionStats());
     seenHashes.add(messageHash);
@@ -99,14 +96,35 @@ public class InMemoryDatabase {
     return seenExceptionReports.get(messageHash);
   }
 
-  public ExceptionStats getExceptionStats(String messageHash) {
+  public List<ExceptionStats> getExceptionStats(
+      String messageHash, ExceptionStats aggregateExceptionStats) {
+    Instant earliest = Instant.MAX;
+    Instant latest = Instant.MIN;
+    int total = 0;
+
+    List<ExceptionStats> results = new LinkedList<>();
     for (String uniqueIdentifier : seenExceptions.keySet()) {
       if (uniqueIdentifier.startsWith(messageHash)) {
-        return seenExceptions.get(uniqueIdentifier);
+        ExceptionStats exceptionStats = seenExceptions.get(uniqueIdentifier);
+        if (earliest.isAfter(exceptionStats.getFirstSeen())) {
+          earliest = exceptionStats.getFirstSeen();
+        }
+
+        if (latest.isBefore(exceptionStats.getLastSeen())) {
+          latest = exceptionStats.getLastSeen();
+        }
+
+        total += exceptionStats.getSeenCount().get();
+
+        results.add(seenExceptions.get(uniqueIdentifier));
       }
     }
 
-    return null;
+    aggregateExceptionStats.setFirstSeen(earliest);
+    aggregateExceptionStats.setLastSeen(latest);
+    aggregateExceptionStats.getSeenCount().set(total);
+
+    return results;
   }
 
   public Map<String, List<SkippedMessage>> getSkippedMessages() {

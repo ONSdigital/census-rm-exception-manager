@@ -2,7 +2,6 @@ package uk.gov.ons.census.exceptionmanager.endpoint;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.TemporalAmount;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -12,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import uk.gov.ons.census.exceptionmanager.model.BadMessageReport;
+import uk.gov.ons.census.exceptionmanager.model.ExceptionStats;
 import uk.gov.ons.census.exceptionmanager.model.SkippedMessage;
 import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
@@ -33,9 +33,15 @@ public class AdminEndpoint {
   @GetMapping(path = "/badmessage/{messageHash}")
   public ResponseEntity<BadMessageReport> getBadMessageDetails(
       @PathVariable("messageHash") String messageHash) {
+    ExceptionStats aggregateExceptionStats = new ExceptionStats();
+    List<ExceptionStats> exceptionStatsList =
+        inMemoryDatabase.getExceptionStats(messageHash, aggregateExceptionStats);
+
     BadMessageReport badMessageReport = new BadMessageReport();
     badMessageReport.setExceptionReports(inMemoryDatabase.getSeenExceptionReports(messageHash));
-    badMessageReport.setExceptionStats(inMemoryDatabase.getExceptionStats(messageHash));
+    badMessageReport.setExceptionStatsList(exceptionStatsList);
+    badMessageReport.setExceptionStats(aggregateExceptionStats);
+
     return ResponseEntity.status(HttpStatus.OK).body(badMessageReport);
   }
 

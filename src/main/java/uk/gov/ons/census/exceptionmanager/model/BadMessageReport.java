@@ -6,5 +6,6 @@ import lombok.Data;
 @Data
 public class BadMessageReport {
   ExceptionStats exceptionStats;
+  List<ExceptionStats> exceptionStatsList;
   List<ExceptionReport> exceptionReports;
 }
