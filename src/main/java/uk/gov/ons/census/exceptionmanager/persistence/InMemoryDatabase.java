@@ -1,6 +1,7 @@
 package uk.gov.ons.census.exceptionmanager.persistence;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -87,6 +88,10 @@ public class InMemoryDatabase {
   public List<BadMessageReport> getBadMessageReports(String messageHash) {
     List<BadMessageReport> results = new LinkedList<>();
     List<ExceptionReport> exceptionReportList = messageExceptionReports.get(messageHash);
+
+    if (exceptionReportList == null) {
+      return Collections.emptyList();
+    }
 
     for (ExceptionReport exceptionReport : exceptionReportList) {
       BadMessageReport badMessageReport = new BadMessageReport();
