@@ -18,12 +18,12 @@ import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 @RestController
 public class AdminEndpoint {
   private final InMemoryDatabase inMemoryDatabase;
+  private final int peekTimeout;
 
-  @Value("${peek.timeout}")
-  private int peekTimeout;
-
-  public AdminEndpoint(InMemoryDatabase inMemoryDatabase) {
+  public AdminEndpoint(
+      InMemoryDatabase inMemoryDatabase, @Value("${peek.timeout}") int peekTimeout) {
     this.inMemoryDatabase = inMemoryDatabase;
+    this.peekTimeout = peekTimeout;
   }
 
   @GetMapping(path = "/badmessages")

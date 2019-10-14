@@ -34,12 +34,12 @@ public final class ReportingEndpoint {
   }
 
   @PostMapping(path = "/peekreply")
-  public void reportError(@RequestBody Peek peekReply) {
+  public void peekReply(@RequestBody Peek peekReply) {
     inMemoryDatabase.storePeekMessageReply(peekReply);
   }
 
   @PostMapping(path = "/storeskippedmessage")
-  public void reportError(@RequestBody SkippedMessage skippedMessage) {
+  public void storeSkippedMessage(@RequestBody SkippedMessage skippedMessage) {
     inMemoryDatabase.storeSkippedMessage(skippedMessage);
   }
 }
