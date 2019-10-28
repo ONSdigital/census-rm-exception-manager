@@ -14,6 +14,9 @@ import java.util.Set;
 import org.junit.Test;
 import org.springframework.http.ResponseEntity;
 import uk.gov.ons.census.exceptionmanager.model.BadMessageReport;
+import uk.gov.ons.census.exceptionmanager.model.BadMessageSummary;
+import uk.gov.ons.census.exceptionmanager.model.ExceptionReport;
+import uk.gov.ons.census.exceptionmanager.model.ExceptionStats;
 import uk.gov.ons.census.exceptionmanager.model.SkippedMessage;
 import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
@@ -33,6 +36,44 @@ public class AdminEndpointTest {
     // Then
     assertThat(actualResponse.getBody()).isEqualTo(testSet);
     verify(inMemoryDatabase).getSeenMessageHashes();
+  }
+
+  @Test
+  public void getBadMessagesSummary() {
+    // Given
+    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
+    Set testSet = Set.of("test message hash");
+    ExceptionReport exceptionReport = new ExceptionReport();
+    exceptionReport.setQueue("test queue");
+    exceptionReport.setService("test service");
+    ExceptionStats exceptionStats = new ExceptionStats();
+    exceptionStats.getSeenCount().set(666);
+    BadMessageReport badMessageReport = new BadMessageReport();
+    badMessageReport.setExceptionReport(exceptionReport);
+    badMessageReport.setStats(exceptionStats);
+    List<BadMessageReport> badMessageReportList = List.of(badMessageReport);
+    when(inMemoryDatabase.getSeenMessageHashes()).thenReturn(testSet);
+    when(inMemoryDatabase.getBadMessageReports(anyString())).thenReturn(badMessageReportList);
+    when(inMemoryDatabase.shouldWeSkipThisMessage(anyString())).thenReturn(true);
+    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+
+    // When
+    ResponseEntity<List<BadMessageSummary>> actualResponse = underTest.getBadMessagesSummary();
+
+    // Then
+    verify(inMemoryDatabase).getSeenMessageHashes();
+    verify(inMemoryDatabase).getBadMessageReports(eq("test message hash"));
+    verify(inMemoryDatabase).shouldWeSkipThisMessage(eq("test message hash"));
+
+    assertThat(actualResponse.getBody()).isNotNull();
+    assertThat(actualResponse.getBody().size()).isEqualTo(1);
+    BadMessageSummary actualBadMessageSummary = actualResponse.getBody().get(0);
+    assertThat(actualBadMessageSummary.getAffectedQueues()).containsOnly("test queue");
+    assertThat(actualBadMessageSummary.getAffectedServices()).containsOnly("test service");
+    assertThat(actualBadMessageSummary.getFirstSeen()).isEqualTo(exceptionStats.getFirstSeen());
+    assertThat(actualBadMessageSummary.getLastSeen()).isEqualTo(exceptionStats.getLastSeen());
+    assertThat(actualBadMessageSummary.getSeenCount()).isEqualTo(666);
+    assertThat(actualBadMessageSummary.isQuarantined()).isTrue();
   }
 
   @Test

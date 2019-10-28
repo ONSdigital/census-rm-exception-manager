@@ -2,6 +2,8 @@ package uk.gov.ons.census.exceptionmanager.endpoint;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import uk.gov.ons.census.exceptionmanager.model.BadMessageReport;
+import uk.gov.ons.census.exceptionmanager.model.BadMessageSummary;
 import uk.gov.ons.census.exceptionmanager.model.SkippedMessage;
 import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
@@ -29,6 +32,46 @@ public class AdminEndpoint {
   @GetMapping(path = "/badmessages")
   public ResponseEntity<Set<String>> getBadMessages() {
     return ResponseEntity.status(HttpStatus.OK).body(inMemoryDatabase.getSeenMessageHashes());
+  }
+
+  @GetMapping(path = "/badmessages/summary")
+  public ResponseEntity<List<BadMessageSummary>> getBadMessagesSummary() {
+    List<BadMessageSummary> badMessageSummaryList = new LinkedList<>();
+    for (String messageHash : inMemoryDatabase.getSeenMessageHashes()) {
+      BadMessageSummary badMessageSummary = new BadMessageSummary();
+      badMessageSummary.setMessageHash(messageHash);
+      badMessageSummaryList.add(badMessageSummary);
+
+      Instant firstSeen = Instant.MAX;
+      Instant lastSeen = Instant.MIN;
+      int seenCount = 0;
+      Set<String> affectedServices = new HashSet<>();
+      Set<String> affectedQueues = new HashSet<>();
+
+      for (BadMessageReport badMessageReport : inMemoryDatabase.getBadMessageReports(messageHash)) {
+        if (badMessageReport.getStats().getFirstSeen().isBefore(firstSeen)) {
+          firstSeen = badMessageReport.getStats().getFirstSeen();
+        }
+
+        if (badMessageReport.getStats().getLastSeen().isAfter(lastSeen)) {
+          lastSeen = badMessageReport.getStats().getLastSeen();
+        }
+
+        seenCount += badMessageReport.getStats().getSeenCount().get();
+
+        affectedServices.add(badMessageReport.getExceptionReport().getService());
+        affectedQueues.add(badMessageReport.getExceptionReport().getQueue());
+      }
+
+      badMessageSummary.setFirstSeen(firstSeen);
+      badMessageSummary.setLastSeen(lastSeen);
+      badMessageSummary.setSeenCount(seenCount);
+      badMessageSummary.setAffectedServices(affectedServices);
+      badMessageSummary.setAffectedQueues(affectedQueues);
+      badMessageSummary.setQuarantined(inMemoryDatabase.shouldWeSkipThisMessage(messageHash));
+    }
+
+    return ResponseEntity.status(HttpStatus.OK).body(badMessageSummaryList);
   }
 
   @GetMapping(path = "/badmessage/{messageHash}")
