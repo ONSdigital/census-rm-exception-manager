@@ -11,6 +11,5 @@ RUN groupadd --gid 999 exceptionmanager && \
     useradd --create-home --system --uid 999 --gid exceptionmanager exceptionmanager
 USER exceptionmanager
 
-
 ARG JAR_FILE=census-rm-exception-manager*.jar
 COPY target/$JAR_FILE /opt/census-rm-exception-manager.jar
