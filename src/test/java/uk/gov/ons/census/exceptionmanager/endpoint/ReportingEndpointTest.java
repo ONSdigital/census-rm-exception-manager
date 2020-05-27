@@ -7,12 +7,16 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Map;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.ResponseEntity;
-import uk.gov.ons.census.exceptionmanager.model.ExceptionReport;
-import uk.gov.ons.census.exceptionmanager.model.Peek;
-import uk.gov.ons.census.exceptionmanager.model.Response;
-import uk.gov.ons.census.exceptionmanager.model.SkippedMessage;
+import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionReport;
+import uk.gov.ons.census.exceptionmanager.model.dto.Peek;
+import uk.gov.ons.census.exceptionmanager.model.dto.Response;
+import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
+import uk.gov.ons.census.exceptionmanager.model.entity.QuarantinedMessage;
+import uk.gov.ons.census.exceptionmanager.model.repository.QuarantinedMessageRepository;
 import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
 public class ReportingEndpointTest {
@@ -21,7 +25,7 @@ public class ReportingEndpointTest {
   public void testReportError() {
     String testMessageHash = "test message hash";
     InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
-    ReportingEndpoint underTest = new ReportingEndpoint(inMemoryDatabase);
+    ReportingEndpoint underTest = new ReportingEndpoint(inMemoryDatabase, null);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash(testMessageHash);
 
@@ -42,7 +46,7 @@ public class ReportingEndpointTest {
   @Test
   public void testPeekReply() {
     InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
-    ReportingEndpoint underTest = new ReportingEndpoint(inMemoryDatabase);
+    ReportingEndpoint underTest = new ReportingEndpoint(inMemoryDatabase, null);
     Peek peek = new Peek();
 
     underTest.peekReply(peek);
@@ -53,11 +57,32 @@ public class ReportingEndpointTest {
   @Test
   public void testStoreSkippedMessage() {
     InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
-    ReportingEndpoint underTest = new ReportingEndpoint(inMemoryDatabase);
+    QuarantinedMessageRepository quarantinedMessageRepository =
+        mock(QuarantinedMessageRepository.class);
+    ReportingEndpoint underTest =
+        new ReportingEndpoint(inMemoryDatabase, quarantinedMessageRepository);
     SkippedMessage skippedMessage = new SkippedMessage();
+    skippedMessage.setMessageHash("test message hash");
+    skippedMessage.setQueue("test queue");
+    skippedMessage.setContentType("application/xml");
+    skippedMessage.setHeaders(Map.of("foo", "bar"));
+    skippedMessage.setMessagePayload("<noodle>poodle</noodle>".getBytes());
+    skippedMessage.setRoutingKey("test routing key");
+    skippedMessage.setService("test service");
 
     underTest.storeSkippedMessage(skippedMessage);
 
     verify(inMemoryDatabase).storeSkippedMessage(eq(skippedMessage));
+
+    ArgumentCaptor<QuarantinedMessage> quarantinedMessageArgCaptor =
+        ArgumentCaptor.forClass(QuarantinedMessage.class);
+    verify(quarantinedMessageRepository).save(quarantinedMessageArgCaptor.capture());
+    QuarantinedMessage quarantinedMessage = quarantinedMessageArgCaptor.getValue();
+    assertThat(quarantinedMessage.getContentType()).isEqualTo(skippedMessage.getContentType());
+    assertThat(quarantinedMessage.getHeaders()).isEqualTo(skippedMessage.getHeaders());
+    assertThat(quarantinedMessage.getMessagePayload())
+        .isEqualTo(skippedMessage.getMessagePayload());
+    assertThat(quarantinedMessage.getRoutingKey()).isEqualTo(skippedMessage.getRoutingKey());
+    assertThat(quarantinedMessage.getService()).isEqualTo(skippedMessage.getService());
   }
 }

@@ -9,11 +9,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Component;
-import uk.gov.ons.census.exceptionmanager.model.BadMessageReport;
-import uk.gov.ons.census.exceptionmanager.model.ExceptionReport;
-import uk.gov.ons.census.exceptionmanager.model.ExceptionStats;
-import uk.gov.ons.census.exceptionmanager.model.Peek;
-import uk.gov.ons.census.exceptionmanager.model.SkippedMessage;
+import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageReport;
+import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionReport;
+import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionStats;
+import uk.gov.ons.census.exceptionmanager.model.dto.Peek;
+import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
 
 @Component
 public class InMemoryDatabase {
@@ -74,7 +74,6 @@ public class InMemoryDatabase {
   }
 
   public synchronized void storeSkippedMessage(SkippedMessage skippedMessage) {
-    // TODO: Persist this to a Rabbit queue or a database so it can be replayed if necessary
     // Make damn certain this is thread safe so we don't lose anything
     List<SkippedMessage> skippedMessageList =
         skippedMessages.computeIfAbsent(skippedMessage.getMessageHash(), key -> new LinkedList<>());
