@@ -72,7 +72,6 @@ public class InMemoryDatabase {
   }
 
   public boolean shouldWeSkipThisMessage(ExceptionReport exceptionReport) {
-    boolean autoQuarantineMessage = false;
     EvaluationContext context = new StandardEvaluationContext(exceptionReport);
     for (Expression expression : autoQuarantineExpressions) {
       Boolean expressionResult = expression.getValue(context, Boolean.class);
@@ -80,12 +79,9 @@ public class InMemoryDatabase {
         log.with("exception_report", exceptionReport)
             .with("expression", expression.getExpressionString())
             .warn("Auto-quarantine message rule matched");
-        autoQuarantineMessage = true;
-        break;
+        return true;
       }
     }
-
-    if (autoQuarantineMessage) return true;
 
     return messagesToSkip.contains(exceptionReport.getMessageHash());
   }
