@@ -1,5 +1,7 @@
 package uk.gov.ons.census.exceptionmanager.persistence;
 
+import com.godaddy.logging.Logger;
+import com.godaddy.logging.LoggerFactory;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -8,21 +10,44 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import org.springframework.expression.EvaluationContext;
+import org.springframework.expression.Expression;
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Component;
 import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageReport;
 import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionReport;
 import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionStats;
 import uk.gov.ons.census.exceptionmanager.model.dto.Peek;
 import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
+import uk.gov.ons.census.exceptionmanager.model.entity.AutoQuarantineRule;
+import uk.gov.ons.census.exceptionmanager.model.repository.AutoQuarantineRuleRepository;
 
 @Component
 public class InMemoryDatabase {
+  private static final Logger log = LoggerFactory.getLogger(InMemoryDatabase.class);
   private Map<ExceptionReport, ExceptionStats> seenExceptions = new HashMap<>();
   private Map<String, List<ExceptionReport>> messageExceptionReports = new HashMap<>();
   private Set<String> messagesToSkip = new HashSet<>();
   private Set<String> messagesToPeek = new HashSet<>();
   private Map<String, byte[]> peekedMessages = new HashMap<>();
   private Map<String, List<SkippedMessage>> skippedMessages = new HashMap<>();
+  private List<Expression> autoQuarantineExpressions = new LinkedList<>();
+  private final AutoQuarantineRuleRepository quarantineRuleRepository;
+
+  public InMemoryDatabase(AutoQuarantineRuleRepository quarantineRuleRepository) {
+    this.quarantineRuleRepository = quarantineRuleRepository;
+
+    List<AutoQuarantineRule> autoQuarantineRules = quarantineRuleRepository.findAll();
+
+    for (AutoQuarantineRule rule : autoQuarantineRules) {
+      ExpressionParser expressionParser = new SpelExpressionParser();
+      Expression spelExpression = expressionParser.parseExpression(rule.getExpression());
+      autoQuarantineExpressions.add(spelExpression);
+    }
+  }
 
   public synchronized void updateStats(ExceptionReport exceptionReport) {
     String messageHash = exceptionReport.getMessageHash();
@@ -46,7 +71,26 @@ public class InMemoryDatabase {
     return seenExceptions.get(exceptionReport) == null;
   }
 
-  public boolean shouldWeSkipThisMessage(String messageHash) {
+  public boolean shouldWeSkipThisMessage(ExceptionReport exceptionReport) {
+    boolean autoQuarantineMessage = false;
+    EvaluationContext context = new StandardEvaluationContext(exceptionReport);
+    for (Expression expression : autoQuarantineExpressions) {
+      Boolean expressionResult = expression.getValue(context, Boolean.class);
+      if (expressionResult) {
+        log.with("exception_report", exceptionReport)
+            .with("expression", expression.getExpressionString())
+            .warn("Auto-quarantine message rule matched");
+        autoQuarantineMessage = true;
+        break;
+      }
+    }
+
+    if (autoQuarantineMessage) return true;
+
+    return messagesToSkip.contains(exceptionReport.getMessageHash());
+  }
+
+  public boolean isQuarantined(String messageHash) {
     return messagesToSkip.contains(messageHash);
   }
 
@@ -116,5 +160,17 @@ public class InMemoryDatabase {
     messagesToSkip.clear();
     messagesToPeek.clear();
     peekedMessages.clear();
+  }
+
+  public void addQuarantineRuleExpression(String expression) {
+    ExpressionParser expressionParser = new SpelExpressionParser();
+    Expression spelExpression = expressionParser.parseExpression(expression);
+
+    AutoQuarantineRule autoQuarantineRule = new AutoQuarantineRule();
+    autoQuarantineRule.setId(UUID.randomUUID());
+    autoQuarantineRule.setExpression(expression);
+    quarantineRuleRepository.saveAndFlush(autoQuarantineRule);
+
+    autoQuarantineExpressions.add(spelExpression);
   }
 }

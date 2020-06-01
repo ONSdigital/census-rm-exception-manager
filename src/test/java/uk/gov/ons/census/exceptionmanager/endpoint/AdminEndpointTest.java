@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.Test;
 import org.springframework.http.ResponseEntity;
+import uk.gov.ons.census.exceptionmanager.model.dto.AutoQuarantineRule;
 import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageReport;
 import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageSummary;
 import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionReport;
@@ -54,7 +55,7 @@ public class AdminEndpointTest {
     List<BadMessageReport> badMessageReportList = List.of(badMessageReport);
     when(inMemoryDatabase.getSeenMessageHashes()).thenReturn(testSet);
     when(inMemoryDatabase.getBadMessageReports(anyString())).thenReturn(badMessageReportList);
-    when(inMemoryDatabase.shouldWeSkipThisMessage(anyString())).thenReturn(true);
+    when(inMemoryDatabase.isQuarantined(anyString())).thenReturn(true);
     AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
 
     // When
@@ -63,7 +64,7 @@ public class AdminEndpointTest {
     // Then
     verify(inMemoryDatabase).getSeenMessageHashes();
     verify(inMemoryDatabase).getBadMessageReports(eq("test message hash"));
-    verify(inMemoryDatabase).shouldWeSkipThisMessage(eq("test message hash"));
+    verify(inMemoryDatabase).isQuarantined(eq("test message hash"));
 
     assertThat(actualResponse.getBody()).isNotNull();
     assertThat(actualResponse.getBody().size()).isEqualTo(1);
@@ -187,5 +188,20 @@ public class AdminEndpointTest {
 
     // Then
     verify(inMemoryDatabase).reset();
+  }
+
+  @Test
+  public void testAddQuarantineRule() {
+    // Given
+    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
+    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+
+    // When
+    AutoQuarantineRule autoQuarantineRule = new AutoQuarantineRule();
+    autoQuarantineRule.setExpression("true");
+    underTest.addQuarantineRule(autoQuarantineRule);
+
+    // Then
+    verify(inMemoryDatabase).addQuarantineRuleExpression(eq("true"));
   }
 }

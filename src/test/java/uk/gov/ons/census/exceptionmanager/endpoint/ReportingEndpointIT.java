@@ -17,11 +17,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
+import uk.gov.ons.census.exceptionmanager.model.dto.AutoQuarantineRule;
 import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionReport;
 import uk.gov.ons.census.exceptionmanager.model.dto.Peek;
 import uk.gov.ons.census.exceptionmanager.model.dto.Response;
 import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
 import uk.gov.ons.census.exceptionmanager.model.entity.QuarantinedMessage;
+import uk.gov.ons.census.exceptionmanager.model.repository.AutoQuarantineRuleRepository;
 import uk.gov.ons.census.exceptionmanager.model.repository.QuarantinedMessageRepository;
 import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
@@ -35,6 +37,7 @@ public class ReportingEndpointIT {
 
   @Autowired private InMemoryDatabase inMemoryDatabase;
   @Autowired private QuarantinedMessageRepository quarantinedMessageRepository;
+  @Autowired private AutoQuarantineRuleRepository autoQuarantineRuleRepository;
 
   @LocalServerPort private int port;
 
@@ -42,6 +45,7 @@ public class ReportingEndpointIT {
   public void setUp() {
     quarantinedMessageRepository.deleteAllInBatch();
     inMemoryDatabase.reset();
+    autoQuarantineRuleRepository.deleteAllInBatch();
   }
 
   @Test
@@ -66,6 +70,45 @@ public class ReportingEndpointIT {
 
     Response actualResponse = objectMapper.readValue(response.getBody(), Response.class);
     assertThat(actualResponse.isSkipIt()).isFalse();
+    assertThat(actualResponse.isLogIt()).isTrue();
+    assertThat(actualResponse.isPeek()).isFalse();
+
+    assertThat(inMemoryDatabase.getBadMessageReports(TEST_MESSAGE_HASH).size()).isEqualTo(1);
+  }
+
+  @Test
+  public void testReportExceptionAutoQuarantine() throws Exception {
+    AutoQuarantineRule autoQuarantineRule = new AutoQuarantineRule();
+    autoQuarantineRule.setExpression("exceptionMessage.contains('quarantine_me')");
+
+    ExceptionReport exceptionReport = new ExceptionReport();
+    exceptionReport.setMessageHash(TEST_MESSAGE_HASH);
+    exceptionReport.setService("test service");
+    exceptionReport.setQueue("test queue");
+    exceptionReport.setExceptionClass("test class");
+    exceptionReport.setExceptionMessage("test quarantine_me message");
+
+    Map<String, String> headers = new HashMap<>();
+    headers.put("accept", "application/json");
+    headers.put("Content-Type", "application/json");
+    HttpResponse<String> response =
+        Unirest.post(String.format("http://localhost:%d/quarantinerule", port))
+            .headers(headers)
+            .body(objectMapper.writeValueAsString(autoQuarantineRule))
+            .asString();
+
+    assertThat(response.getStatus()).isEqualTo(OK.value());
+
+    response =
+        Unirest.post(String.format("http://localhost:%d/reportexception", port))
+            .headers(headers)
+            .body(objectMapper.writeValueAsString(exceptionReport))
+            .asString();
+
+    assertThat(response.getStatus()).isEqualTo(OK.value());
+
+    Response actualResponse = objectMapper.readValue(response.getBody(), Response.class);
+    assertThat(actualResponse.isSkipIt()).isTrue();
     assertThat(actualResponse.isLogIt()).isTrue();
     assertThat(actualResponse.isPeek()).isFalse();
 

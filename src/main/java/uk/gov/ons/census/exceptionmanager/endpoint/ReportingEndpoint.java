@@ -33,7 +33,7 @@ public class ReportingEndpoint {
     Response result = new Response();
     String messageHash = exceptionReport.getMessageHash();
 
-    result.setSkipIt(inMemoryDatabase.shouldWeSkipThisMessage(messageHash));
+    result.setSkipIt(inMemoryDatabase.shouldWeSkipThisMessage(exceptionReport));
     result.setPeek(inMemoryDatabase.shouldWePeekThisMessage(messageHash));
     result.setLogIt(inMemoryDatabase.shouldWeLogThisMessage(exceptionReport));
 
