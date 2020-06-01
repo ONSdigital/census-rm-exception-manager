@@ -13,9 +13,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
-import uk.gov.ons.census.exceptionmanager.model.BadMessageReport;
-import uk.gov.ons.census.exceptionmanager.model.BadMessageSummary;
-import uk.gov.ons.census.exceptionmanager.model.SkippedMessage;
+import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageReport;
+import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageSummary;
+import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
 import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
 @RestController

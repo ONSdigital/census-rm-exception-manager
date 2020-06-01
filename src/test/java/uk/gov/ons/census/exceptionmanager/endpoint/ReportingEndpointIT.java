@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
@@ -16,10 +17,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
-import uk.gov.ons.census.exceptionmanager.model.ExceptionReport;
-import uk.gov.ons.census.exceptionmanager.model.Peek;
-import uk.gov.ons.census.exceptionmanager.model.Response;
-import uk.gov.ons.census.exceptionmanager.model.SkippedMessage;
+import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionReport;
+import uk.gov.ons.census.exceptionmanager.model.dto.Peek;
+import uk.gov.ons.census.exceptionmanager.model.dto.Response;
+import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
+import uk.gov.ons.census.exceptionmanager.model.entity.QuarantinedMessage;
+import uk.gov.ons.census.exceptionmanager.model.repository.QuarantinedMessageRepository;
 import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
 @RunWith(SpringRunner.class)
@@ -31,11 +34,13 @@ public class ReportingEndpointIT {
   private static final ObjectMapper objectMapper = new ObjectMapper();
 
   @Autowired private InMemoryDatabase inMemoryDatabase;
+  @Autowired private QuarantinedMessageRepository quarantinedMessageRepository;
 
   @LocalServerPort private int port;
 
   @Before
   public void setUp() {
+    quarantinedMessageRepository.deleteAllInBatch();
     inMemoryDatabase.reset();
   }
 
@@ -90,6 +95,8 @@ public class ReportingEndpointIT {
 
   @Test
   public void testStoreSkippedMessage() throws Exception {
+    testReportException();
+
     SkippedMessage skippedMessage = new SkippedMessage();
     skippedMessage.setMessageHash(TEST_MESSAGE_HASH);
     skippedMessage.setQueue("test queue");
@@ -97,6 +104,7 @@ public class ReportingEndpointIT {
     skippedMessage.setHeaders(Map.of("foo", "bar"));
     skippedMessage.setMessagePayload("<noodle>poodle</noodle>".getBytes());
     skippedMessage.setRoutingKey("test routing key");
+    skippedMessage.setService("test service");
     skippedMessage.setSkippedTimestamp(null);
 
     Map<String, String> headers = new HashMap<>();
@@ -110,7 +118,20 @@ public class ReportingEndpointIT {
 
     assertThat(response.getStatus()).isEqualTo(OK.value());
 
-    assertThat(inMemoryDatabase.getSkippedMessages(TEST_MESSAGE_HASH).get(0))
-        .isEqualTo(skippedMessage);
+    List<SkippedMessage> skippedMessages = inMemoryDatabase.getSkippedMessages(TEST_MESSAGE_HASH);
+    assertThat(skippedMessages.size()).isEqualTo(1);
+    assertThat(skippedMessages.get(0)).isEqualTo(skippedMessage);
+
+    List<QuarantinedMessage> allQuarantinedMessages = quarantinedMessageRepository.findAll();
+    assertThat(allQuarantinedMessages.size()).isEqualTo(1);
+    QuarantinedMessage quarantinedMessage = allQuarantinedMessages.get(0);
+    assertThat(quarantinedMessage.getContentType()).isEqualTo(skippedMessage.getContentType());
+    assertThat(quarantinedMessage.getHeaders()).isEqualTo(skippedMessage.getHeaders());
+    assertThat(quarantinedMessage.getMessagePayload())
+        .isEqualTo(skippedMessage.getMessagePayload());
+    assertThat(quarantinedMessage.getRoutingKey()).isEqualTo(skippedMessage.getRoutingKey());
+    assertThat(quarantinedMessage.getService()).isEqualTo(skippedMessage.getService());
+    assertThat(quarantinedMessage.getSkippedTimestamp()).isNotNull();
+    assertThat(quarantinedMessage.getErrorReports()).isNotBlank();
   }
 }

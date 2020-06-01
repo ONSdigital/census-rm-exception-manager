@@ -13,11 +13,11 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.Test;
 import org.springframework.http.ResponseEntity;
-import uk.gov.ons.census.exceptionmanager.model.BadMessageReport;
-import uk.gov.ons.census.exceptionmanager.model.BadMessageSummary;
-import uk.gov.ons.census.exceptionmanager.model.ExceptionReport;
-import uk.gov.ons.census.exceptionmanager.model.ExceptionStats;
-import uk.gov.ons.census.exceptionmanager.model.SkippedMessage;
+import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageReport;
+import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageSummary;
+import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionReport;
+import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionStats;
+import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
 import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
 public class AdminEndpointTest {

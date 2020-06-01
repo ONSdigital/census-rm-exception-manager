@@ -5,11 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
-import uk.gov.ons.census.exceptionmanager.model.BadMessageReport;
-import uk.gov.ons.census.exceptionmanager.model.ExceptionReport;
-import uk.gov.ons.census.exceptionmanager.model.ExceptionStats;
-import uk.gov.ons.census.exceptionmanager.model.Peek;
-import uk.gov.ons.census.exceptionmanager.model.SkippedMessage;
+import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageReport;
+import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionReport;
+import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionStats;
+import uk.gov.ons.census.exceptionmanager.model.dto.Peek;
+import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
 
 public class InMemoryDatabaseTest {
   @Test

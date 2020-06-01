@@ -1,4 +1,4 @@
-package uk.gov.ons.census.exceptionmanager.model;
+package uk.gov.ons.census.exceptionmanager.model.dto;
 
 import lombok.Data;
 
