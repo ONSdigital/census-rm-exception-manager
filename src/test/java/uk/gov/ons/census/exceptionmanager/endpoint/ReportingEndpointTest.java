@@ -1,6 +1,7 @@
 package uk.gov.ons.census.exceptionmanager.endpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -29,13 +30,13 @@ public class ReportingEndpointTest {
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash(testMessageHash);
 
-    when(inMemoryDatabase.shouldWeSkipThisMessage(anyString())).thenReturn(true);
+    when(inMemoryDatabase.shouldWeSkipThisMessage(any(ExceptionReport.class))).thenReturn(true);
     when(inMemoryDatabase.shouldWePeekThisMessage(anyString())).thenReturn(true);
     when(inMemoryDatabase.shouldWeLogThisMessage(exceptionReport)).thenReturn(true);
 
     ResponseEntity<Response> actualResponse = underTest.reportError(exceptionReport);
 
-    verify(inMemoryDatabase).shouldWeSkipThisMessage(eq(testMessageHash));
+    verify(inMemoryDatabase).shouldWeSkipThisMessage(eq(exceptionReport));
     verify(inMemoryDatabase).shouldWePeekThisMessage(eq(testMessageHash));
     verify(inMemoryDatabase).shouldWeLogThisMessage(eq(exceptionReport));
     assertThat(actualResponse.getBody().isSkipIt()).isTrue();

@@ -1,7 +1,10 @@
 package uk.gov.ons.census.exceptionmanager.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
@@ -10,11 +13,16 @@ import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionReport;
 import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionStats;
 import uk.gov.ons.census.exceptionmanager.model.dto.Peek;
 import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
+import uk.gov.ons.census.exceptionmanager.model.entity.AutoQuarantineRule;
+import uk.gov.ons.census.exceptionmanager.model.repository.AutoQuarantineRuleRepository;
 
 public class InMemoryDatabaseTest {
   @Test
   public void testUpdateStats() {
-    InMemoryDatabase underTest = new InMemoryDatabase();
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash("test message hash");
     exceptionReport.setExceptionClass("test class");
@@ -24,7 +32,7 @@ public class InMemoryDatabaseTest {
 
     underTest.updateStats(exceptionReport);
 
-    assertThat(underTest.shouldWeSkipThisMessage("test message hash")).isFalse();
+    assertThat(underTest.shouldWeSkipThisMessage(exceptionReport)).isFalse();
     assertThat(underTest.shouldWeLogThisMessage(exceptionReport)).isFalse();
     assertThat(underTest.shouldWePeekThisMessage("test message hash")).isFalse();
 
@@ -37,7 +45,10 @@ public class InMemoryDatabaseTest {
 
   @Test
   public void testUpdateStatsSameTwice() {
-    InMemoryDatabase underTest = new InMemoryDatabase();
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash("test message hash");
     exceptionReport.setExceptionClass("test class");
@@ -48,7 +59,7 @@ public class InMemoryDatabaseTest {
     underTest.updateStats(exceptionReport);
     underTest.updateStats(exceptionReport);
 
-    assertThat(underTest.shouldWeSkipThisMessage("test message hash")).isFalse();
+    assertThat(underTest.shouldWeSkipThisMessage(exceptionReport)).isFalse();
     assertThat(underTest.shouldWeLogThisMessage(exceptionReport)).isFalse();
     assertThat(underTest.shouldWePeekThisMessage("test message hash")).isFalse();
 
@@ -61,7 +72,10 @@ public class InMemoryDatabaseTest {
 
   @Test
   public void testUpdateStatsDifferentTimes() {
-    InMemoryDatabase underTest = new InMemoryDatabase();
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
     ExceptionReport exceptionReportOne = new ExceptionReport();
     exceptionReportOne.setMessageHash("test message hash");
     exceptionReportOne.setExceptionClass("test class");
@@ -81,7 +95,7 @@ public class InMemoryDatabaseTest {
     underTest.updateStats(exceptionReportTwo);
     underTest.updateStats(exceptionReportTwo);
 
-    assertThat(underTest.shouldWeSkipThisMessage("test message hash")).isFalse();
+    assertThat(underTest.shouldWeSkipThisMessage(exceptionReportOne)).isFalse();
     assertThat(underTest.shouldWeLogThisMessage(exceptionReportOne)).isFalse();
     assertThat(underTest.shouldWeLogThisMessage(exceptionReportTwo)).isFalse();
     assertThat(underTest.shouldWePeekThisMessage("test message hash")).isFalse();
@@ -100,8 +114,11 @@ public class InMemoryDatabaseTest {
   }
 
   @Test
-  public void tesShouldWeLog() {
-    InMemoryDatabase underTest = new InMemoryDatabase();
+  public void testShouldWeLog() {
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash("test message hash");
     exceptionReport.setExceptionClass("test class");
@@ -117,8 +134,11 @@ public class InMemoryDatabaseTest {
   }
 
   @Test
-  public void tesShouldWeSkip() {
-    InMemoryDatabase underTest = new InMemoryDatabase();
+  public void testShouldWeSkip() {
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash("test message hash");
     exceptionReport.setExceptionClass("test class");
@@ -126,20 +146,77 @@ public class InMemoryDatabaseTest {
     exceptionReport.setQueue("test queue");
     exceptionReport.setService("test service");
 
-    assertThat(underTest.shouldWeSkipThisMessage("test message hash")).isFalse();
+    assertThat(underTest.shouldWeSkipThisMessage(exceptionReport)).isFalse();
 
     underTest.updateStats(exceptionReport);
 
-    assertThat(underTest.shouldWeSkipThisMessage("test message hash")).isFalse();
+    assertThat(underTest.shouldWeSkipThisMessage(exceptionReport)).isFalse();
 
     underTest.skipMessage("test message hash");
 
-    assertThat(underTest.shouldWeSkipThisMessage("test message hash")).isTrue();
+    assertThat(underTest.shouldWeSkipThisMessage(exceptionReport)).isTrue();
   }
 
   @Test
-  public void tesShouldWePeek() {
-    InMemoryDatabase underTest = new InMemoryDatabase();
+  public void testShouldWeSkipAutoQuarantineMatch() {
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    AutoQuarantineRule rule = new AutoQuarantineRule();
+    rule.setExpression("exceptionClass == \"test class\" and queue == \"test queue\"");
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.singletonList(rule));
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
+    ExceptionReport exceptionReport = new ExceptionReport();
+    exceptionReport.setMessageHash("test message hash");
+    exceptionReport.setExceptionClass("test class");
+    exceptionReport.setExceptionMessage("test exception message");
+    exceptionReport.setQueue("test queue");
+    exceptionReport.setService("test service");
+
+    assertThat(underTest.shouldWeSkipThisMessage(exceptionReport)).isTrue();
+  }
+
+  @Test
+  public void testShouldWeSkipAutoQuarantineMatchSubstring() {
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    AutoQuarantineRule rule = new AutoQuarantineRule();
+    rule.setExpression("exceptionMessage.contains('message')");
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.singletonList(rule));
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
+    ExceptionReport exceptionReport = new ExceptionReport();
+    exceptionReport.setMessageHash("test message hash");
+    exceptionReport.setExceptionClass("test class");
+    exceptionReport.setExceptionMessage("test exception message");
+    exceptionReport.setQueue("test queue");
+    exceptionReport.setService("test service");
+
+    assertThat(underTest.shouldWeSkipThisMessage(exceptionReport)).isTrue();
+  }
+
+  @Test
+  public void testShouldWeSkipAutoQuarantineDoesNotMatch() {
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    AutoQuarantineRule rule = new AutoQuarantineRule();
+    rule.setExpression("exceptionClass == \"noodle\" and queue == \"test queue\"");
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.singletonList(rule));
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
+    ExceptionReport exceptionReport = new ExceptionReport();
+    exceptionReport.setMessageHash("test message hash");
+    exceptionReport.setExceptionClass("test class");
+    exceptionReport.setExceptionMessage("test exception message");
+    exceptionReport.setQueue("test queue");
+    exceptionReport.setService("test service");
+
+    assertThat(underTest.shouldWeSkipThisMessage(exceptionReport)).isFalse();
+  }
+
+  @Test
+  public void testShouldWePeek() {
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash("test message hash");
     exceptionReport.setExceptionClass("test class");
@@ -160,7 +237,10 @@ public class InMemoryDatabaseTest {
 
   @Test
   public void testGetSeenMessageHashes() {
-    InMemoryDatabase underTest = new InMemoryDatabase();
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
     ExceptionReport exceptionReportOne = new ExceptionReport();
     exceptionReportOne.setMessageHash("test message hash");
     exceptionReportOne.setExceptionClass("test class");
@@ -188,7 +268,10 @@ public class InMemoryDatabaseTest {
 
   @Test
   public void testStorePeekMessageReply() {
-    InMemoryDatabase underTest = new InMemoryDatabase();
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
     Peek peek = new Peek();
     peek.setMessageHash("test message hash");
     peek.setMessagePayload("test message".getBytes());
@@ -200,7 +283,10 @@ public class InMemoryDatabaseTest {
 
   @Test
   public void testStoreSkippedMessage() {
-    InMemoryDatabase underTest = new InMemoryDatabase();
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
     SkippedMessage skippedMessage = new SkippedMessage();
     skippedMessage.setMessageHash("test message hash");
     underTest.storeSkippedMessage(skippedMessage);
@@ -213,7 +299,10 @@ public class InMemoryDatabaseTest {
 
   @Test
   public void testStoreTwoSkippedMessagse() {
-    InMemoryDatabase underTest = new InMemoryDatabase();
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
     SkippedMessage skippedMessageOne = new SkippedMessage();
     skippedMessageOne.setMessageHash("test message hash");
     skippedMessageOne.setQueue("test queue one");
@@ -230,7 +319,10 @@ public class InMemoryDatabaseTest {
 
   @Test
   public void testReset() {
-    InMemoryDatabase underTest = new InMemoryDatabase();
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    InMemoryDatabase underTest = new InMemoryDatabase(autoQuarantineRuleRepository);
     SkippedMessage skippedMessageOne = new SkippedMessage();
     skippedMessageOne.setMessageHash("test message hash");
     skippedMessageOne.setQueue("test queue one");
