@@ -169,4 +169,21 @@ public class InMemoryDatabase {
 
     autoQuarantineExpressions.add(spelExpression);
   }
+
+  public List<AutoQuarantineRule> getQuarantineRules() {
+    return quarantineRuleRepository.findAll();
+  }
+
+  public void deleteQuarantineRule(String id) {
+    quarantineRuleRepository.deleteById(UUID.fromString(id));
+    List<AutoQuarantineRule> rules = quarantineRuleRepository.findAll();
+    List<Expression> newRules = new LinkedList<>();
+    for (AutoQuarantineRule rule : rules) {
+      ExpressionParser expressionParser = new SpelExpressionParser();
+      Expression spelExpression = expressionParser.parseExpression(rule.getExpression());
+      newRules.add(spelExpression);
+    }
+
+    autoQuarantineExpressions = newRules;
+  }
 }

@@ -1,6 +1,7 @@
 package uk.gov.ons.census.exceptionmanager.endpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -10,8 +11,12 @@ import static org.mockito.Mockito.when;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.Test;
+import org.springframework.amqp.core.MessagePostProcessor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.ResponseEntity;
 import uk.gov.ons.census.exceptionmanager.model.dto.AutoQuarantineRule;
 import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageReport;
@@ -19,6 +24,8 @@ import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageSummary;
 import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionReport;
 import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionStats;
 import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
+import uk.gov.ons.census.exceptionmanager.model.entity.QuarantinedMessage;
+import uk.gov.ons.census.exceptionmanager.model.repository.QuarantinedMessageRepository;
 import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 
 public class AdminEndpointTest {
@@ -29,7 +36,7 @@ public class AdminEndpointTest {
     InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
     Set testSet = Collections.emptySet();
     when(inMemoryDatabase.getSeenMessageHashes()).thenReturn(testSet);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500, null, null);
 
     // When
     ResponseEntity<Set<String>> actualResponse = underTest.getBadMessages();
@@ -56,7 +63,7 @@ public class AdminEndpointTest {
     when(inMemoryDatabase.getSeenMessageHashes()).thenReturn(testSet);
     when(inMemoryDatabase.getBadMessageReports(anyString())).thenReturn(badMessageReportList);
     when(inMemoryDatabase.isQuarantined(anyString())).thenReturn(true);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500, null, null);
 
     // When
     ResponseEntity<List<BadMessageSummary>> actualResponse = underTest.getBadMessagesSummary();
@@ -84,7 +91,7 @@ public class AdminEndpointTest {
     InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
     List testList = Collections.emptyList();
     when(inMemoryDatabase.getBadMessageReports(anyString())).thenReturn(testList);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500, null, null);
 
     // When
     ResponseEntity<List<BadMessageReport>> actualResponse =
@@ -100,7 +107,7 @@ public class AdminEndpointTest {
     // Given
     String testMessageHash = "test message hash";
     InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500, null, null);
 
     // When
     underTest.skipMessage(testMessageHash);
@@ -132,7 +139,7 @@ public class AdminEndpointTest {
         .thenReturn(null)
         .thenReturn(null)
         .thenReturn(testPeekedMessageBody);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500, null, null);
 
     // When
     ResponseEntity<String> actualResponse = underTest.peekMessage(testMessageHash);
@@ -148,7 +155,7 @@ public class AdminEndpointTest {
     InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
     Map testMap = Collections.emptyMap();
     when(inMemoryDatabase.getAllSkippedMessages()).thenReturn(testMap);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500, null, null);
 
     // When
     ResponseEntity<Map<String, List<SkippedMessage>>> actualResponse =
@@ -166,7 +173,7 @@ public class AdminEndpointTest {
     InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
     List testList = Collections.emptyList();
     when(inMemoryDatabase.getSkippedMessages(anyString())).thenReturn(testList);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500, null, null);
 
     // When
     ResponseEntity<List<SkippedMessage>> actualResponse =
@@ -181,7 +188,7 @@ public class AdminEndpointTest {
   public void testReset() {
     // Given
     InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500, null, null);
 
     // When
     underTest.reset();
@@ -194,7 +201,7 @@ public class AdminEndpointTest {
   public void testAddQuarantineRule() {
     // Given
     InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500, null, null);
 
     // When
     AutoQuarantineRule autoQuarantineRule = new AutoQuarantineRule();
@@ -203,5 +210,47 @@ public class AdminEndpointTest {
 
     // Then
     verify(inMemoryDatabase).addQuarantineRuleExpression(eq("true"));
+  }
+
+  @Test
+  public void testDeleteQuarantineRule() {
+    // Given
+    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
+    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500, null, null);
+
+    // When
+    underTest.deleteQuarantineRules("test id");
+
+    // Then
+    verify(inMemoryDatabase).deleteQuarantineRule(eq("test id"));
+  }
+
+  @Test
+  public void testReplayQuarantinedMessage() {
+    // Given
+    QuarantinedMessageRepository quarantinedMessageRepository =
+        mock(QuarantinedMessageRepository.class);
+    RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
+    AdminEndpoint underTest =
+        new AdminEndpoint(null, 500, quarantinedMessageRepository, rabbitTemplate);
+
+    UUID testId = UUID.randomUUID();
+    QuarantinedMessage quarantinedMessage = new QuarantinedMessage();
+    quarantinedMessage.setRoutingKey("test routing key");
+    quarantinedMessage.setMessagePayload("test payload".getBytes());
+    Optional<QuarantinedMessage> quarantinedMessageOpt = Optional.of(quarantinedMessage);
+    when(quarantinedMessageRepository.findById(any(UUID.class))).thenReturn(quarantinedMessageOpt);
+
+    // When
+    underTest.replaySkippedMessage(testId.toString());
+
+    // Then
+    verify(quarantinedMessageRepository).findById(eq(testId));
+    verify(rabbitTemplate)
+        .convertAndSend(
+            eq(quarantinedMessage.getQueue()),
+            eq("test payload".getBytes()),
+            any(MessagePostProcessor.class));
+    verify(quarantinedMessageRepository).delete(eq(quarantinedMessage));
   }
 }

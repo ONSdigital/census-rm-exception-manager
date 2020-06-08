@@ -11,3 +11,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  rabbitmq:
+    container_name: rabbitmq-exceptionmanager-it
+    image: rabbitmq:3.6.10-management
+    ports:
+      - "34369:4369"
+      - "55672:25672"
+      - "35671:5671"
+      - "35672:5672"
+      - "46671:15671"
+      - "46672:15672"
+    volumes:
+      - ./rabbitmq.config:/etc/rabbitmq/rabbitmq.config:ro
+      - ./definitions.json:/opt/definitions.json:ro

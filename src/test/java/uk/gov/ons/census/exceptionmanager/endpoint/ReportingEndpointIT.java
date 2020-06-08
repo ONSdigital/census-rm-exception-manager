@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpStatus.OK;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.TextNode;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import java.util.HashMap;
@@ -32,7 +33,7 @@ import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
 @ActiveProfiles("test")
 public class ReportingEndpointIT {
   private static final String TEST_MESSAGE_HASH =
-      "9af5350f1e61149cd0bb7dfa5efae46f224aaaffed729b220d63e0fe5a8bf4b9";
+      "9af5350f1e61149cd0bb7dfa5efae46f224aaaffed729b220d63e0fe5a8bf4b8";
   private static final ObjectMapper objectMapper = new ObjectMapper();
 
   @Autowired private InMemoryDatabase inMemoryDatabase;
@@ -169,7 +170,9 @@ public class ReportingEndpointIT {
     assertThat(allQuarantinedMessages.size()).isEqualTo(1);
     QuarantinedMessage quarantinedMessage = allQuarantinedMessages.get(0);
     assertThat(quarantinedMessage.getContentType()).isEqualTo(skippedMessage.getContentType());
-    assertThat(quarantinedMessage.getHeaders()).isEqualTo(skippedMessage.getHeaders());
+    assertThat(quarantinedMessage.getHeaders().size())
+        .isEqualTo(skippedMessage.getHeaders().size());
+    assertThat(quarantinedMessage.getHeaders().get("foo")).isEqualTo(new TextNode("bar"));
     assertThat(quarantinedMessage.getMessagePayload())
         .isEqualTo(skippedMessage.getMessagePayload());
     assertThat(quarantinedMessage.getRoutingKey()).isEqualTo(skippedMessage.getRoutingKey());
