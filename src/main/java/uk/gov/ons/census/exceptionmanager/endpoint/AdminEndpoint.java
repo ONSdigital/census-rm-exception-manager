@@ -183,31 +183,29 @@ public class AdminEndpoint {
   public void replaySkippedMessage(@PathVariable("id") String id) {
     Optional<QuarantinedMessage> quarantinedMessageOpt =
         quarantinedMessageRepository.findById(UUID.fromString(id));
-    if (quarantinedMessageOpt.isPresent()) {
-      QuarantinedMessage quarantinedMessage = quarantinedMessageOpt.get();
-
-      if (quarantinedMessage.getRoutingKey().equals("none")) {
-        throw new RuntimeException("Cannot replay PubSub messages... yet"); // TODO
-      }
-
-      MessagePostProcessor mpp =
-          message -> {
-            message.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
-            message.getMessageProperties().setContentType(quarantinedMessage.getContentType());
-            for (Entry<String, JsonNode> headerEntry : quarantinedMessage.getHeaders().entrySet()) {
-              message
-                  .getMessageProperties()
-                  .setHeader(headerEntry.getKey(), headerEntry.getValue());
-            }
-            return message;
-          };
-
-      rabbitTemplate.convertAndSend(
-          quarantinedMessage.getQueue(), quarantinedMessage.getMessagePayload(), mpp);
-
-      quarantinedMessageRepository.delete(quarantinedMessage);
-    } else {
+    if (!quarantinedMessageOpt.isPresent()) {
       throw new RuntimeException("Cannot find quarantined message with ID: " + id);
     }
+
+    QuarantinedMessage quarantinedMessage = quarantinedMessageOpt.get();
+
+    if (quarantinedMessage.getRoutingKey().equals("none")) {
+      throw new RuntimeException("Cannot replay PubSub messages... yet"); // TODO
+    }
+
+    MessagePostProcessor mpp =
+        message -> {
+          message.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+          message.getMessageProperties().setContentType(quarantinedMessage.getContentType());
+          for (Entry<String, JsonNode> headerEntry : quarantinedMessage.getHeaders().entrySet()) {
+            message.getMessageProperties().setHeader(headerEntry.getKey(), headerEntry.getValue());
+          }
+          return message;
+        };
+
+    rabbitTemplate.convertAndSend(
+        quarantinedMessage.getQueue(), quarantinedMessage.getMessagePayload(), mpp);
+
+    quarantinedMessageRepository.delete(quarantinedMessage);
   }
 }
