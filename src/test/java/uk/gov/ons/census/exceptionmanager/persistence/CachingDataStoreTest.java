@@ -1,11 +1,14 @@
 package uk.gov.ons.census.exceptionmanager.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageReport;
@@ -384,5 +387,37 @@ public class CachingDataStoreTest {
     assertThat(underTest.getBadMessageReports("test message hash")).isEmpty();
     assertThat(underTest.getAllSkippedMessages()).isNotEmpty();
     assertThat(underTest.getAllSkippedMessages()).isNotEmpty();
+  }
+
+  @Test
+  public void testGetQuarantineRules() {
+    // Given
+    List<AutoQuarantineRule> expectedAutoQuarantineRules = Collections.EMPTY_LIST;
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(expectedAutoQuarantineRules);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+
+    // When
+    List<AutoQuarantineRule> actualQuarantineRules = underTest.getQuarantineRules();
+
+    // Then
+    assertThat(actualQuarantineRules).isEqualTo(expectedAutoQuarantineRules);
+  }
+
+  @Test
+  public void testDeleteQuarantineRule() {
+    List<AutoQuarantineRule> expectedAutoQuarantineRules = Collections.EMPTY_LIST;
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(expectedAutoQuarantineRules);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    UUID testId = UUID.randomUUID();
+
+    // When
+    underTest.deleteQuarantineRule(testId.toString());
+
+    // Then
+    verify(autoQuarantineRuleRepository).deleteById(eq(testId));
   }
 }

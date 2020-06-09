@@ -14,7 +14,6 @@ import java.util.UUID;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.web.server.LocalServerPort;
@@ -23,6 +22,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
 import uk.gov.ons.census.exceptionmanager.model.entity.QuarantinedMessage;
 import uk.gov.ons.census.exceptionmanager.model.repository.QuarantinedMessageRepository;
+import uk.gov.ons.census.exceptionmanager.persistence.CachingDataStore;
 import uk.gov.ons.census.exceptionmanager.testutil.QueueSpy;
 import uk.gov.ons.census.exceptionmanager.testutil.RabbitQueueHelper;
 
@@ -39,14 +39,15 @@ public class AdminEndpointIT {
 
   @Autowired private RabbitQueueHelper rabbitQueueHelper;
 
-  @Autowired RabbitTemplate rabbitTemplate;
+  @Autowired private QuarantinedMessageRepository quarantinedMessageRepository;
 
-  @Autowired QuarantinedMessageRepository quarantinedMessageRepository;
+  @Autowired private CachingDataStore cachingDataStore;
 
   @Before
   public void setUp() {
     quarantinedMessageRepository.deleteAllInBatch();
     rabbitQueueHelper.purgeQueue(TEST_QUEUE_NAME);
+    cachingDataStore.reset();
   }
 
   @Test

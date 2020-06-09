@@ -17,6 +17,7 @@ import java.util.UUID;
 import org.junit.Test;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import uk.gov.ons.census.exceptionmanager.model.dto.AutoQuarantineRule;
 import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageReport;
@@ -252,5 +253,28 @@ public class AdminEndpointTest {
             eq("test payload".getBytes()),
             any(MessagePostProcessor.class));
     verify(quarantinedMessageRepository).delete(eq(quarantinedMessage));
+  }
+
+  @Test
+  public void testGetQuarantineRules() {
+    // Given
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
+    uk.gov.ons.census.exceptionmanager.model.entity.AutoQuarantineRule autoQuarantineRule =
+        new uk.gov.ons.census.exceptionmanager.model.entity.AutoQuarantineRule();
+    autoQuarantineRule.setExpression("true == true");
+    when(cachingDataStore.getQuarantineRules())
+        .thenReturn(Collections.singletonList(autoQuarantineRule));
+    AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
+
+    // When
+    ResponseEntity<List<AutoQuarantineRule>> quarantineRulesResponse =
+        underTest.getQuarantineRules();
+
+    // Then
+    AutoQuarantineRule expectedAutoQuarantineRule = new AutoQuarantineRule();
+    expectedAutoQuarantineRule.setExpression("true == true");
+    assertThat(quarantineRulesResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(quarantineRulesResponse.getBody().size()).isEqualTo(1);
+    assertThat(quarantineRulesResponse.getBody().get(0)).isEqualTo(expectedAutoQuarantineRule);
   }
 }
