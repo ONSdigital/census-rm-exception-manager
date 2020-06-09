@@ -26,8 +26,8 @@ import uk.gov.ons.census.exceptionmanager.model.entity.AutoQuarantineRule;
 import uk.gov.ons.census.exceptionmanager.model.repository.AutoQuarantineRuleRepository;
 
 @Component
-public class InMemoryDatabase {
-  private static final Logger log = LoggerFactory.getLogger(InMemoryDatabase.class);
+public class CachingDataStore {
+  private static final Logger log = LoggerFactory.getLogger(CachingDataStore.class);
   private Map<ExceptionReport, ExceptionStats> seenExceptions = new HashMap<>();
   private Map<String, List<ExceptionReport>> messageExceptionReports = new HashMap<>();
   private Set<String> messagesToSkip = new HashSet<>();
@@ -37,7 +37,7 @@ public class InMemoryDatabase {
   private List<Expression> autoQuarantineExpressions = new LinkedList<>();
   private final AutoQuarantineRuleRepository quarantineRuleRepository;
 
-  public InMemoryDatabase(AutoQuarantineRuleRepository quarantineRuleRepository) {
+  public CachingDataStore(AutoQuarantineRuleRepository quarantineRuleRepository) {
     this.quarantineRuleRepository = quarantineRuleRepository;
 
     List<AutoQuarantineRule> autoQuarantineRules = quarantineRuleRepository.findAll();
@@ -168,5 +168,22 @@ public class InMemoryDatabase {
     quarantineRuleRepository.saveAndFlush(autoQuarantineRule);
 
     autoQuarantineExpressions.add(spelExpression);
+  }
+
+  public List<AutoQuarantineRule> getQuarantineRules() {
+    return quarantineRuleRepository.findAll();
+  }
+
+  public void deleteQuarantineRule(String id) {
+    quarantineRuleRepository.deleteById(UUID.fromString(id));
+    List<AutoQuarantineRule> rules = quarantineRuleRepository.findAll();
+    List<Expression> newRules = new LinkedList<>();
+    for (AutoQuarantineRule rule : rules) {
+      ExpressionParser expressionParser = new SpelExpressionParser();
+      Expression spelExpression = expressionParser.parseExpression(rule.getExpression());
+      newRules.add(spelExpression);
+    }
+
+    autoQuarantineExpressions = newRules;
   }
 }

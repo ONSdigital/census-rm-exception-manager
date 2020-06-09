@@ -1,6 +1,7 @@
 package uk.gov.ons.census.exceptionmanager.endpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -10,8 +11,13 @@ import static org.mockito.Mockito.when;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.Test;
+import org.springframework.amqp.core.MessagePostProcessor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import uk.gov.ons.census.exceptionmanager.model.dto.AutoQuarantineRule;
 import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageReport;
@@ -19,30 +25,32 @@ import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageSummary;
 import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionReport;
 import uk.gov.ons.census.exceptionmanager.model.dto.ExceptionStats;
 import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
-import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
+import uk.gov.ons.census.exceptionmanager.model.entity.QuarantinedMessage;
+import uk.gov.ons.census.exceptionmanager.model.repository.QuarantinedMessageRepository;
+import uk.gov.ons.census.exceptionmanager.persistence.CachingDataStore;
 
 public class AdminEndpointTest {
 
   @Test
   public void testGetBadMessages() {
     // Given
-    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
     Set testSet = Collections.emptySet();
-    when(inMemoryDatabase.getSeenMessageHashes()).thenReturn(testSet);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    when(cachingDataStore.getSeenMessageHashes()).thenReturn(testSet);
+    AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
     ResponseEntity<Set<String>> actualResponse = underTest.getBadMessages();
 
     // Then
     assertThat(actualResponse.getBody()).isEqualTo(testSet);
-    verify(inMemoryDatabase).getSeenMessageHashes();
+    verify(cachingDataStore).getSeenMessageHashes();
   }
 
   @Test
   public void getBadMessagesSummary() {
     // Given
-    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
     Set testSet = Set.of("test message hash");
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setQueue("test queue");
@@ -53,18 +61,18 @@ public class AdminEndpointTest {
     badMessageReport.setExceptionReport(exceptionReport);
     badMessageReport.setStats(exceptionStats);
     List<BadMessageReport> badMessageReportList = List.of(badMessageReport);
-    when(inMemoryDatabase.getSeenMessageHashes()).thenReturn(testSet);
-    when(inMemoryDatabase.getBadMessageReports(anyString())).thenReturn(badMessageReportList);
-    when(inMemoryDatabase.isQuarantined(anyString())).thenReturn(true);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    when(cachingDataStore.getSeenMessageHashes()).thenReturn(testSet);
+    when(cachingDataStore.getBadMessageReports(anyString())).thenReturn(badMessageReportList);
+    when(cachingDataStore.isQuarantined(anyString())).thenReturn(true);
+    AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
     ResponseEntity<List<BadMessageSummary>> actualResponse = underTest.getBadMessagesSummary();
 
     // Then
-    verify(inMemoryDatabase).getSeenMessageHashes();
-    verify(inMemoryDatabase).getBadMessageReports(eq("test message hash"));
-    verify(inMemoryDatabase).isQuarantined(eq("test message hash"));
+    verify(cachingDataStore).getSeenMessageHashes();
+    verify(cachingDataStore).getBadMessageReports(eq("test message hash"));
+    verify(cachingDataStore).isQuarantined(eq("test message hash"));
 
     assertThat(actualResponse.getBody()).isNotNull();
     assertThat(actualResponse.getBody().size()).isEqualTo(1);
@@ -81,10 +89,10 @@ public class AdminEndpointTest {
   public void testGetBadMessageDetails() {
     // Given
     String testMessageHash = "test message hash";
-    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
     List testList = Collections.emptyList();
-    when(inMemoryDatabase.getBadMessageReports(anyString())).thenReturn(testList);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    when(cachingDataStore.getBadMessageReports(anyString())).thenReturn(testList);
+    AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
     ResponseEntity<List<BadMessageReport>> actualResponse =
@@ -92,30 +100,30 @@ public class AdminEndpointTest {
 
     // Then
     assertThat(actualResponse.getBody()).isEqualTo(testList);
-    verify(inMemoryDatabase).getBadMessageReports(eq(testMessageHash));
+    verify(cachingDataStore).getBadMessageReports(eq(testMessageHash));
   }
 
   @Test
   public void testSkipMessage() {
     // Given
     String testMessageHash = "test message hash";
-    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
+    AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
     underTest.skipMessage(testMessageHash);
 
     // Then
-    verify(inMemoryDatabase).skipMessage(eq(testMessageHash));
+    verify(cachingDataStore).skipMessage(eq(testMessageHash));
   }
 
   @Test
   public void testPeekMessage() {
     // Given
     String testMessageHash = "test message hash";
-    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
     byte[] testPeekedMessageBody = "test message body".getBytes();
-    when(inMemoryDatabase.getPeekedMessage(anyString()))
+    when(cachingDataStore.getPeekedMessage(anyString()))
         .thenReturn(null)
         .thenReturn(null)
         .thenReturn(null)
@@ -132,23 +140,23 @@ public class AdminEndpointTest {
         .thenReturn(null)
         .thenReturn(null)
         .thenReturn(testPeekedMessageBody);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
     ResponseEntity<String> actualResponse = underTest.peekMessage(testMessageHash);
 
     // Then
     assertThat(actualResponse.getBody()).isEqualTo(new String(testPeekedMessageBody));
-    verify(inMemoryDatabase).peekMessage(eq(testMessageHash));
+    verify(cachingDataStore).peekMessage(eq(testMessageHash));
   }
 
   @Test
   public void testGetAllSkippedMessages() {
     // Given
-    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
     Map testMap = Collections.emptyMap();
-    when(inMemoryDatabase.getAllSkippedMessages()).thenReturn(testMap);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    when(cachingDataStore.getAllSkippedMessages()).thenReturn(testMap);
+    AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
     ResponseEntity<Map<String, List<SkippedMessage>>> actualResponse =
@@ -156,17 +164,17 @@ public class AdminEndpointTest {
 
     // Then
     assertThat(actualResponse.getBody()).isEqualTo(testMap);
-    verify(inMemoryDatabase).getAllSkippedMessages();
+    verify(cachingDataStore).getAllSkippedMessages();
   }
 
   @Test
   public void testGetSkippedMessage() {
     // Given
     String testMessageHash = "test message hash";
-    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
     List testList = Collections.emptyList();
-    when(inMemoryDatabase.getSkippedMessages(anyString())).thenReturn(testList);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    when(cachingDataStore.getSkippedMessages(anyString())).thenReturn(testList);
+    AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
     ResponseEntity<List<SkippedMessage>> actualResponse =
@@ -174,27 +182,27 @@ public class AdminEndpointTest {
 
     // Then
     assertThat(actualResponse.getBody()).isEqualTo(testList);
-    verify(inMemoryDatabase).getSkippedMessages(eq(testMessageHash));
+    verify(cachingDataStore).getSkippedMessages(eq(testMessageHash));
   }
 
   @Test
   public void testReset() {
     // Given
-    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
+    AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
     underTest.reset();
 
     // Then
-    verify(inMemoryDatabase).reset();
+    verify(cachingDataStore).reset();
   }
 
   @Test
   public void testAddQuarantineRule() {
     // Given
-    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
-    AdminEndpoint underTest = new AdminEndpoint(inMemoryDatabase, 500);
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
+    AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
     AutoQuarantineRule autoQuarantineRule = new AutoQuarantineRule();
@@ -202,6 +210,71 @@ public class AdminEndpointTest {
     underTest.addQuarantineRule(autoQuarantineRule);
 
     // Then
-    verify(inMemoryDatabase).addQuarantineRuleExpression(eq("true"));
+    verify(cachingDataStore).addQuarantineRuleExpression(eq("true"));
+  }
+
+  @Test
+  public void testDeleteQuarantineRule() {
+    // Given
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
+    AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
+
+    // When
+    underTest.deleteQuarantineRules("test id");
+
+    // Then
+    verify(cachingDataStore).deleteQuarantineRule(eq("test id"));
+  }
+
+  @Test
+  public void testReplayQuarantinedMessage() {
+    // Given
+    QuarantinedMessageRepository quarantinedMessageRepository =
+        mock(QuarantinedMessageRepository.class);
+    RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
+    AdminEndpoint underTest =
+        new AdminEndpoint(null, 500, quarantinedMessageRepository, rabbitTemplate);
+
+    UUID testId = UUID.randomUUID();
+    QuarantinedMessage quarantinedMessage = new QuarantinedMessage();
+    quarantinedMessage.setRoutingKey("test routing key");
+    quarantinedMessage.setMessagePayload("test payload".getBytes());
+    Optional<QuarantinedMessage> quarantinedMessageOpt = Optional.of(quarantinedMessage);
+    when(quarantinedMessageRepository.findById(any(UUID.class))).thenReturn(quarantinedMessageOpt);
+
+    // When
+    underTest.replaySkippedMessage(testId.toString());
+
+    // Then
+    verify(quarantinedMessageRepository).findById(eq(testId));
+    verify(rabbitTemplate)
+        .convertAndSend(
+            eq(quarantinedMessage.getQueue()),
+            eq("test payload".getBytes()),
+            any(MessagePostProcessor.class));
+    verify(quarantinedMessageRepository).delete(eq(quarantinedMessage));
+  }
+
+  @Test
+  public void testGetQuarantineRules() {
+    // Given
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
+    uk.gov.ons.census.exceptionmanager.model.entity.AutoQuarantineRule autoQuarantineRule =
+        new uk.gov.ons.census.exceptionmanager.model.entity.AutoQuarantineRule();
+    autoQuarantineRule.setExpression("true == true");
+    when(cachingDataStore.getQuarantineRules())
+        .thenReturn(Collections.singletonList(autoQuarantineRule));
+    AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
+
+    // When
+    ResponseEntity<List<AutoQuarantineRule>> quarantineRulesResponse =
+        underTest.getQuarantineRules();
+
+    // Then
+    AutoQuarantineRule expectedAutoQuarantineRule = new AutoQuarantineRule();
+    expectedAutoQuarantineRule.setExpression("true == true");
+    assertThat(quarantineRulesResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(quarantineRulesResponse.getBody().size()).isEqualTo(1);
+    assertThat(quarantineRulesResponse.getBody().get(0)).isEqualTo(expectedAutoQuarantineRule);
   }
 }

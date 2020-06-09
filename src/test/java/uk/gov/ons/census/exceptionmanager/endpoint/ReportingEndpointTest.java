@@ -18,27 +18,27 @@ import uk.gov.ons.census.exceptionmanager.model.dto.Response;
 import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
 import uk.gov.ons.census.exceptionmanager.model.entity.QuarantinedMessage;
 import uk.gov.ons.census.exceptionmanager.model.repository.QuarantinedMessageRepository;
-import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
+import uk.gov.ons.census.exceptionmanager.persistence.CachingDataStore;
 
 public class ReportingEndpointTest {
 
   @Test
   public void testReportError() {
     String testMessageHash = "test message hash";
-    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
-    ReportingEndpoint underTest = new ReportingEndpoint(inMemoryDatabase, null);
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
+    ReportingEndpoint underTest = new ReportingEndpoint(cachingDataStore, null);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash(testMessageHash);
 
-    when(inMemoryDatabase.shouldWeSkipThisMessage(any(ExceptionReport.class))).thenReturn(true);
-    when(inMemoryDatabase.shouldWePeekThisMessage(anyString())).thenReturn(true);
-    when(inMemoryDatabase.shouldWeLogThisMessage(exceptionReport)).thenReturn(true);
+    when(cachingDataStore.shouldWeSkipThisMessage(any(ExceptionReport.class))).thenReturn(true);
+    when(cachingDataStore.shouldWePeekThisMessage(anyString())).thenReturn(true);
+    when(cachingDataStore.shouldWeLogThisMessage(exceptionReport)).thenReturn(true);
 
     ResponseEntity<Response> actualResponse = underTest.reportError(exceptionReport);
 
-    verify(inMemoryDatabase).shouldWeSkipThisMessage(eq(exceptionReport));
-    verify(inMemoryDatabase).shouldWePeekThisMessage(eq(testMessageHash));
-    verify(inMemoryDatabase).shouldWeLogThisMessage(eq(exceptionReport));
+    verify(cachingDataStore).shouldWeSkipThisMessage(eq(exceptionReport));
+    verify(cachingDataStore).shouldWePeekThisMessage(eq(testMessageHash));
+    verify(cachingDataStore).shouldWeLogThisMessage(eq(exceptionReport));
     assertThat(actualResponse.getBody().isSkipIt()).isTrue();
     assertThat(actualResponse.getBody().isPeek()).isTrue();
     assertThat(actualResponse.getBody().isLogIt()).isTrue();
@@ -46,22 +46,22 @@ public class ReportingEndpointTest {
 
   @Test
   public void testPeekReply() {
-    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
-    ReportingEndpoint underTest = new ReportingEndpoint(inMemoryDatabase, null);
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
+    ReportingEndpoint underTest = new ReportingEndpoint(cachingDataStore, null);
     Peek peek = new Peek();
 
     underTest.peekReply(peek);
 
-    verify(inMemoryDatabase).storePeekMessageReply(eq(peek));
+    verify(cachingDataStore).storePeekMessageReply(eq(peek));
   }
 
   @Test
   public void testStoreSkippedMessage() {
-    InMemoryDatabase inMemoryDatabase = mock(InMemoryDatabase.class);
+    CachingDataStore cachingDataStore = mock(CachingDataStore.class);
     QuarantinedMessageRepository quarantinedMessageRepository =
         mock(QuarantinedMessageRepository.class);
     ReportingEndpoint underTest =
-        new ReportingEndpoint(inMemoryDatabase, quarantinedMessageRepository);
+        new ReportingEndpoint(cachingDataStore, quarantinedMessageRepository);
     SkippedMessage skippedMessage = new SkippedMessage();
     skippedMessage.setMessageHash("test message hash");
     skippedMessage.setQueue("test queue");
@@ -73,7 +73,7 @@ public class ReportingEndpointTest {
 
     underTest.storeSkippedMessage(skippedMessage);
 
-    verify(inMemoryDatabase).storeSkippedMessage(eq(skippedMessage));
+    verify(cachingDataStore).storeSkippedMessage(eq(skippedMessage));
 
     ArgumentCaptor<QuarantinedMessage> quarantinedMessageArgCaptor =
         ArgumentCaptor.forClass(QuarantinedMessage.class);

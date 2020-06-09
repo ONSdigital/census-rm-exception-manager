@@ -14,17 +14,17 @@ import uk.gov.ons.census.exceptionmanager.model.dto.Response;
 import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
 import uk.gov.ons.census.exceptionmanager.model.entity.QuarantinedMessage;
 import uk.gov.ons.census.exceptionmanager.model.repository.QuarantinedMessageRepository;
-import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
+import uk.gov.ons.census.exceptionmanager.persistence.CachingDataStore;
 
 @RestController
 public class ReportingEndpoint {
-  private final InMemoryDatabase inMemoryDatabase;
+  private final CachingDataStore cachingDataStore;
   private final QuarantinedMessageRepository quarantinedMessageRepository;
 
   public ReportingEndpoint(
-      InMemoryDatabase inMemoryDatabase,
+      CachingDataStore cachingDataStore,
       QuarantinedMessageRepository quarantinedMessageRepository) {
-    this.inMemoryDatabase = inMemoryDatabase;
+    this.cachingDataStore = cachingDataStore;
     this.quarantinedMessageRepository = quarantinedMessageRepository;
   }
 
@@ -33,27 +33,27 @@ public class ReportingEndpoint {
     Response result = new Response();
     String messageHash = exceptionReport.getMessageHash();
 
-    result.setSkipIt(inMemoryDatabase.shouldWeSkipThisMessage(exceptionReport));
-    result.setPeek(inMemoryDatabase.shouldWePeekThisMessage(messageHash));
-    result.setLogIt(inMemoryDatabase.shouldWeLogThisMessage(exceptionReport));
+    result.setSkipIt(cachingDataStore.shouldWeSkipThisMessage(exceptionReport));
+    result.setPeek(cachingDataStore.shouldWePeekThisMessage(messageHash));
+    result.setLogIt(cachingDataStore.shouldWeLogThisMessage(exceptionReport));
 
-    inMemoryDatabase.updateStats(exceptionReport);
+    cachingDataStore.updateStats(exceptionReport);
 
     return ResponseEntity.status(HttpStatus.OK).body(result);
   }
 
   @PostMapping(path = "/peekreply")
   public void peekReply(@RequestBody Peek peekReply) {
-    inMemoryDatabase.storePeekMessageReply(peekReply);
+    cachingDataStore.storePeekMessageReply(peekReply);
   }
 
   @Transactional
   @PostMapping(path = "/storeskippedmessage")
   public void storeSkippedMessage(@RequestBody SkippedMessage skippedMessage) {
-    inMemoryDatabase.storeSkippedMessage(skippedMessage);
+    cachingDataStore.storeSkippedMessage(skippedMessage);
     String errorReports =
         JsonHelper.convertObjectToJson(
-            inMemoryDatabase.getBadMessageReports(skippedMessage.getMessageHash()));
+            cachingDataStore.getBadMessageReports(skippedMessage.getMessageHash()));
 
     QuarantinedMessage quarantinedMessage = new QuarantinedMessage();
     quarantinedMessage.setId(UUID.randomUUID());

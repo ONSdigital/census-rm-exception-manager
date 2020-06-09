@@ -1,5 +1,6 @@
 package uk.gov.ons.census.exceptionmanager.model.entity;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
 import java.time.OffsetDateTime;
 import java.util.Map;
@@ -41,7 +42,7 @@ public class QuarantinedMessage {
 
   @Type(type = "jsonb")
   @Column(columnDefinition = "jsonb")
-  private Map<String, String> headers;
+  private Map<String, JsonNode> headers;
 
   @Type(type = "jsonb")
   @Column(columnDefinition = "jsonb")
