@@ -31,21 +31,21 @@ import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageSummary;
 import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
 import uk.gov.ons.census.exceptionmanager.model.entity.QuarantinedMessage;
 import uk.gov.ons.census.exceptionmanager.model.repository.QuarantinedMessageRepository;
-import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
+import uk.gov.ons.census.exceptionmanager.persistence.CachingDataStore;
 
 @RestController
 public class AdminEndpoint {
-  private final InMemoryDatabase inMemoryDatabase;
+  private final CachingDataStore cachingDataStore;
   private final int peekTimeout;
   private final QuarantinedMessageRepository quarantinedMessageRepository;
   private final RabbitTemplate rabbitTemplate;
 
   public AdminEndpoint(
-      InMemoryDatabase inMemoryDatabase,
+      CachingDataStore cachingDataStore,
       @Value("${peek.timeout}") int peekTimeout,
       QuarantinedMessageRepository quarantinedMessageRepository,
       RabbitTemplate rabbitTemplate) {
-    this.inMemoryDatabase = inMemoryDatabase;
+    this.cachingDataStore = cachingDataStore;
     this.peekTimeout = peekTimeout;
     this.quarantinedMessageRepository = quarantinedMessageRepository;
     this.rabbitTemplate = rabbitTemplate;
@@ -53,13 +53,13 @@ public class AdminEndpoint {
 
   @GetMapping(path = "/badmessages")
   public ResponseEntity<Set<String>> getBadMessages() {
-    return ResponseEntity.status(HttpStatus.OK).body(inMemoryDatabase.getSeenMessageHashes());
+    return ResponseEntity.status(HttpStatus.OK).body(cachingDataStore.getSeenMessageHashes());
   }
 
   @GetMapping(path = "/badmessages/summary")
   public ResponseEntity<List<BadMessageSummary>> getBadMessagesSummary() {
     List<BadMessageSummary> badMessageSummaryList = new LinkedList<>();
-    for (String messageHash : inMemoryDatabase.getSeenMessageHashes()) {
+    for (String messageHash : cachingDataStore.getSeenMessageHashes()) {
       BadMessageSummary badMessageSummary = new BadMessageSummary();
       badMessageSummary.setMessageHash(messageHash);
       badMessageSummaryList.add(badMessageSummary);
@@ -70,7 +70,7 @@ public class AdminEndpoint {
       Set<String> affectedServices = new HashSet<>();
       Set<String> affectedQueues = new HashSet<>();
 
-      for (BadMessageReport badMessageReport : inMemoryDatabase.getBadMessageReports(messageHash)) {
+      for (BadMessageReport badMessageReport : cachingDataStore.getBadMessageReports(messageHash)) {
         if (badMessageReport.getStats().getFirstSeen().isBefore(firstSeen)) {
           firstSeen = badMessageReport.getStats().getFirstSeen();
         }
@@ -90,7 +90,7 @@ public class AdminEndpoint {
       badMessageSummary.setSeenCount(seenCount);
       badMessageSummary.setAffectedServices(affectedServices);
       badMessageSummary.setAffectedQueues(affectedQueues);
-      badMessageSummary.setQuarantined(inMemoryDatabase.isQuarantined(messageHash));
+      badMessageSummary.setQuarantined(cachingDataStore.isQuarantined(messageHash));
     }
 
     return ResponseEntity.status(HttpStatus.OK).body(badMessageSummaryList);
@@ -100,21 +100,21 @@ public class AdminEndpoint {
   public ResponseEntity<List<BadMessageReport>> getBadMessageDetails(
       @PathVariable("messageHash") String messageHash) {
     return ResponseEntity.status(HttpStatus.OK)
-        .body(inMemoryDatabase.getBadMessageReports(messageHash));
+        .body(cachingDataStore.getBadMessageReports(messageHash));
   }
 
   @GetMapping(path = "/skipmessage/{messageHash}")
   public void skipMessage(@PathVariable("messageHash") String messageHash) {
-    inMemoryDatabase.skipMessage(messageHash);
+    cachingDataStore.skipMessage(messageHash);
   }
 
   @GetMapping(path = "/peekmessage/{messageHash}")
   public ResponseEntity<String> peekMessage(@PathVariable("messageHash") String messageHash) {
-    inMemoryDatabase.peekMessage(messageHash);
+    cachingDataStore.peekMessage(messageHash);
 
     byte[] message;
     Instant timeOutTime = Instant.now().plus(Duration.ofMillis(peekTimeout));
-    while ((message = inMemoryDatabase.getPeekedMessage(messageHash)) == null) {
+    while ((message = cachingDataStore.getPeekedMessage(messageHash)) == null) {
       try {
         Thread.sleep(1);
       } catch (InterruptedException e) {
@@ -135,25 +135,25 @@ public class AdminEndpoint {
 
   @GetMapping(path = "/skippedmessages")
   public ResponseEntity<Map<String, List<SkippedMessage>>> getAllSkippedMessages() {
-    return ResponseEntity.status(HttpStatus.OK).body(inMemoryDatabase.getAllSkippedMessages());
+    return ResponseEntity.status(HttpStatus.OK).body(cachingDataStore.getAllSkippedMessages());
   }
 
   @GetMapping(path = "/skippedmessage/{messageHash}")
   public ResponseEntity<List<SkippedMessage>> getSkippedMessage(
       @PathVariable("messageHash") String messageHash) {
     return ResponseEntity.status(HttpStatus.OK)
-        .body(inMemoryDatabase.getSkippedMessages(messageHash));
+        .body(cachingDataStore.getSkippedMessages(messageHash));
   }
 
   @GetMapping(path = "/reset")
   public void reset() {
-    inMemoryDatabase.reset();
+    cachingDataStore.reset();
   }
 
   @GetMapping(path = "/quarantinerule")
   public ResponseEntity<List<AutoQuarantineRule>> getQuarantineRules() {
     List<uk.gov.ons.census.exceptionmanager.model.entity.AutoQuarantineRule> quarantineRules =
-        inMemoryDatabase.getQuarantineRules();
+        cachingDataStore.getQuarantineRules();
     List<AutoQuarantineRule> result =
         quarantineRules.stream()
             .map(
@@ -169,13 +169,13 @@ public class AdminEndpoint {
   @Transactional
   @PostMapping(path = "/quarantinerule")
   public void addQuarantineRule(@RequestBody AutoQuarantineRule autoQuarantineRule) {
-    inMemoryDatabase.addQuarantineRuleExpression(autoQuarantineRule.getExpression());
+    cachingDataStore.addQuarantineRuleExpression(autoQuarantineRule.getExpression());
   }
 
   @Transactional
   @DeleteMapping(path = "/quarantinerule/{id}")
   public void deleteQuarantineRules(@PathVariable("id") String id) {
-    inMemoryDatabase.deleteQuarantineRule(id);
+    cachingDataStore.deleteQuarantineRule(id);
   }
 
   @Transactional

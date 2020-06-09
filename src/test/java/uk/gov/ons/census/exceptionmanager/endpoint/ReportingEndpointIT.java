@@ -26,7 +26,7 @@ import uk.gov.ons.census.exceptionmanager.model.dto.SkippedMessage;
 import uk.gov.ons.census.exceptionmanager.model.entity.QuarantinedMessage;
 import uk.gov.ons.census.exceptionmanager.model.repository.AutoQuarantineRuleRepository;
 import uk.gov.ons.census.exceptionmanager.model.repository.QuarantinedMessageRepository;
-import uk.gov.ons.census.exceptionmanager.persistence.InMemoryDatabase;
+import uk.gov.ons.census.exceptionmanager.persistence.CachingDataStore;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -36,7 +36,7 @@ public class ReportingEndpointIT {
       "9af5350f1e61149cd0bb7dfa5efae46f224aaaffed729b220d63e0fe5a8bf4b8";
   private static final ObjectMapper objectMapper = new ObjectMapper();
 
-  @Autowired private InMemoryDatabase inMemoryDatabase;
+  @Autowired private CachingDataStore cachingDataStore;
   @Autowired private QuarantinedMessageRepository quarantinedMessageRepository;
   @Autowired private AutoQuarantineRuleRepository autoQuarantineRuleRepository;
 
@@ -45,7 +45,7 @@ public class ReportingEndpointIT {
   @Before
   public void setUp() {
     quarantinedMessageRepository.deleteAllInBatch();
-    inMemoryDatabase.reset();
+    cachingDataStore.reset();
     autoQuarantineRuleRepository.deleteAllInBatch();
   }
 
@@ -74,7 +74,7 @@ public class ReportingEndpointIT {
     assertThat(actualResponse.isLogIt()).isTrue();
     assertThat(actualResponse.isPeek()).isFalse();
 
-    assertThat(inMemoryDatabase.getBadMessageReports(TEST_MESSAGE_HASH).size()).isEqualTo(1);
+    assertThat(cachingDataStore.getBadMessageReports(TEST_MESSAGE_HASH).size()).isEqualTo(1);
   }
 
   @Test
@@ -113,7 +113,7 @@ public class ReportingEndpointIT {
     assertThat(actualResponse.isLogIt()).isTrue();
     assertThat(actualResponse.isPeek()).isFalse();
 
-    assertThat(inMemoryDatabase.getBadMessageReports(TEST_MESSAGE_HASH).size()).isEqualTo(1);
+    assertThat(cachingDataStore.getBadMessageReports(TEST_MESSAGE_HASH).size()).isEqualTo(1);
   }
 
   @Test
@@ -133,7 +133,7 @@ public class ReportingEndpointIT {
 
     assertThat(response.getStatus()).isEqualTo(OK.value());
 
-    assertThat(inMemoryDatabase.getPeekedMessage(TEST_MESSAGE_HASH))
+    assertThat(cachingDataStore.getPeekedMessage(TEST_MESSAGE_HASH))
         .isEqualTo(peek.getMessagePayload());
   }
 
@@ -162,7 +162,7 @@ public class ReportingEndpointIT {
 
     assertThat(response.getStatus()).isEqualTo(OK.value());
 
-    List<SkippedMessage> skippedMessages = inMemoryDatabase.getSkippedMessages(TEST_MESSAGE_HASH);
+    List<SkippedMessage> skippedMessages = cachingDataStore.getSkippedMessages(TEST_MESSAGE_HASH);
     assertThat(skippedMessages.size()).isEqualTo(1);
     assertThat(skippedMessages.get(0)).isEqualTo(skippedMessage);
 
