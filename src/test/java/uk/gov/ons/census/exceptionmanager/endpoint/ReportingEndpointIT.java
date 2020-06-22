@@ -57,6 +57,7 @@ public class ReportingEndpointIT {
     exceptionReport.setQueue("test queue");
     exceptionReport.setExceptionClass("test class");
     exceptionReport.setExceptionMessage("test message");
+    exceptionReport.setExceptionRootCause("test root cause");
 
     Map<String, String> headers = new HashMap<>();
     headers.put("accept", "application/json");
