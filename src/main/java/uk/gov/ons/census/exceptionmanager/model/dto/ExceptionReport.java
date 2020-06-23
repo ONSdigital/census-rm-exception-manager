@@ -11,4 +11,5 @@ public class ExceptionReport {
   private String queue;
   private String exceptionClass;
   private String exceptionMessage;
+  private String exceptionRootCause;
 }
