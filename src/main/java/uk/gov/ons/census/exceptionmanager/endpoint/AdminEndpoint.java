@@ -56,16 +56,7 @@ public class AdminEndpoint {
   public ResponseEntity<Set<String>> getBadMessages(
       @RequestParam(value = "minimumSeenCount", required = false, defaultValue = "-1")
           int minimumSeenCount) {
-    Set<String> hashes;
-
-    // -1 means "no minimum"
-    if (minimumSeenCount == -1) {
-      hashes = cachingDataStore.getSeenMessageHashes();
-    } else {
-      hashes = cachingDataStore.getSeenMessageHashes(minimumSeenCount);
-    }
-
-    return ResponseEntity.status(HttpStatus.OK).body(hashes);
+    return ResponseEntity.status(HttpStatus.OK).body(getSeenMessageHashes(minimumSeenCount));
   }
 
   @GetMapping(path = "/badmessages/summary")
@@ -73,7 +64,9 @@ public class AdminEndpoint {
       @RequestParam(value = "minimumSeenCount", required = false, defaultValue = "-1")
           int minimumSeenCount) {
     List<BadMessageSummary> badMessageSummaryList = new LinkedList<>();
-    for (String messageHash : cachingDataStore.getSeenMessageHashes()) {
+    Set<String> hashes = getSeenMessageHashes(minimumSeenCount);
+
+    for (String messageHash : hashes) {
       BadMessageSummary badMessageSummary = new BadMessageSummary();
       badMessageSummary.setMessageHash(messageHash);
       badMessageSummaryList.add(badMessageSummary);
@@ -85,20 +78,18 @@ public class AdminEndpoint {
       Set<String> affectedQueues = new HashSet<>();
 
       for (BadMessageReport badMessageReport : cachingDataStore.getBadMessageReports(messageHash)) {
-        if (badMessageReport.getStats().getSeenCount().get() >= minimumSeenCount) {
-          if (badMessageReport.getStats().getFirstSeen().isBefore(firstSeen)) {
-            firstSeen = badMessageReport.getStats().getFirstSeen();
-          }
-
-          if (badMessageReport.getStats().getLastSeen().isAfter(lastSeen)) {
-            lastSeen = badMessageReport.getStats().getLastSeen();
-          }
-
-          seenCount += badMessageReport.getStats().getSeenCount().get();
-
-          affectedServices.add(badMessageReport.getExceptionReport().getService());
-          affectedQueues.add(badMessageReport.getExceptionReport().getQueue());
+        if (badMessageReport.getStats().getFirstSeen().isBefore(firstSeen)) {
+          firstSeen = badMessageReport.getStats().getFirstSeen();
         }
+
+        if (badMessageReport.getStats().getLastSeen().isAfter(lastSeen)) {
+          lastSeen = badMessageReport.getStats().getLastSeen();
+        }
+
+        seenCount += badMessageReport.getStats().getSeenCount().get();
+
+        affectedServices.add(badMessageReport.getExceptionReport().getService());
+        affectedQueues.add(badMessageReport.getExceptionReport().getQueue());
       }
 
       badMessageSummary.setFirstSeen(firstSeen);
@@ -223,5 +214,18 @@ public class AdminEndpoint {
         quarantinedMessage.getQueue(), quarantinedMessage.getMessagePayload(), mpp);
 
     quarantinedMessageRepository.delete(quarantinedMessage);
+  }
+
+  private Set<String> getSeenMessageHashes(int minimumSeenCount) {
+    Set<String> hashes;
+
+    // -1 means "no minimum"
+    if (minimumSeenCount == -1) {
+      hashes = cachingDataStore.getSeenMessageHashes();
+    } else {
+      hashes = cachingDataStore.getSeenMessageHashes(minimumSeenCount);
+    }
+
+    return hashes;
   }
 }

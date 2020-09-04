@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -156,5 +157,56 @@ public class AdminEndpointIT {
 
       assertThat(quarantinedMessageRepository.findAll().size()).isEqualTo(0);
     }
+  }
+
+  @Test
+  public void testGetBadMessageSummary() throws Exception {
+    Map<String, String> headers = new HashMap<>();
+    headers.put("accept", "application/json");
+    headers.put("Content-Type", "application/json");
+    HttpResponse<String> response =
+        Unirest.get(String.format("http://localhost:%d/badmessages/summary", port))
+            .headers(headers)
+            .asString();
+
+    assertThat(response.getStatus()).isEqualTo(OK.value());
+
+    List actualResponse = objectMapper.readValue(response.getBody(), List.class);
+    assertThat(actualResponse.size()).isEqualTo(0);
+  }
+
+  @Test
+  public void testGetBadMessageSummaryMinimumSeenCount() throws Exception {
+    reportException(port, TEST_MESSAGE_HASH);
+
+    Map<String, String> headers = new HashMap<>();
+    headers.put("accept", "application/json");
+    headers.put("Content-Type", "application/json");
+    HttpResponse<String> response =
+        Unirest.get(
+                String.format("http://localhost:%d/badmessages/summary?minimumSeenCount=2", port))
+            .headers(headers)
+            .asString();
+
+    assertThat(response.getStatus()).isEqualTo(OK.value());
+
+    List<LinkedHashMap> actualResponse = objectMapper.readValue(response.getBody(), List.class);
+    assertThat(actualResponse.size()).isEqualTo(0);
+
+    // Now send a second exception
+    reportException(port, TEST_MESSAGE_HASH);
+
+    response =
+        Unirest.get(
+                String.format("http://localhost:%d/badmessages/summary?minimumSeenCount=2", port))
+            .headers(headers)
+            .asString();
+
+    assertThat(response.getStatus()).isEqualTo(OK.value());
+
+    actualResponse = objectMapper.readValue(response.getBody(), List.class);
+    assertThat(actualResponse.size()).isEqualTo(1);
+    assertThat(actualResponse.get(0).get("messageHash")).isEqualTo(TEST_MESSAGE_HASH);
+    assertThat(actualResponse.get(0).get("seenCount")).isEqualTo(2);
   }
 }
