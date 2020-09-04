@@ -95,12 +95,18 @@ public class CachingDataStore {
   public boolean shouldWeSkipThisMessage(ExceptionReport exceptionReport) {
     EvaluationContext context = new StandardEvaluationContext(exceptionReport);
     for (Expression expression : autoQuarantineExpressions) {
-      Boolean expressionResult = expression.getValue(context, Boolean.class);
-      if (expressionResult != null && expressionResult) {
+      try {
+        Boolean expressionResult = expression.getValue(context, Boolean.class);
+        if (expressionResult != null && expressionResult) {
+          log.with("exception_report", exceptionReport)
+              .with("expression", expression.getExpressionString())
+              .warn("Auto-quarantine message rule matched");
+          return true;
+        }
+      } catch (Exception e) {
         log.with("exception_report", exceptionReport)
             .with("expression", expression.getExpressionString())
-            .warn("Auto-quarantine message rule matched");
-        return true;
+            .warn("Auto-quarantine rule is causing errors", e);
       }
     }
 
