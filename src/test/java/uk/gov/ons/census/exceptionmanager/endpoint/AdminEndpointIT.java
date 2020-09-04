@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -190,7 +189,7 @@ public class AdminEndpointIT {
 
     assertThat(response.getStatus()).isEqualTo(OK.value());
 
-    List<LinkedHashMap> actualResponse = objectMapper.readValue(response.getBody(), List.class);
+    List<Map> actualResponse = objectMapper.readValue(response.getBody(), List.class);
     assertThat(actualResponse.size()).isEqualTo(0);
 
     // Now send a second exception
