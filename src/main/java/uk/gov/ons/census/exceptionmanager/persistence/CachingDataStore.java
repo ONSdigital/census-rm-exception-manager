@@ -96,7 +96,7 @@ public class CachingDataStore {
     EvaluationContext context = new StandardEvaluationContext(exceptionReport);
     for (Expression expression : autoQuarantineExpressions) {
       Boolean expressionResult = expression.getValue(context, Boolean.class);
-      if (expressionResult) {
+      if (expressionResult != null && expressionResult) {
         log.with("exception_report", exceptionReport)
             .with("expression", expression.getExpressionString())
             .warn("Auto-quarantine message rule matched");
