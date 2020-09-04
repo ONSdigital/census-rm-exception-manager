@@ -25,7 +25,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash("test message hash");
     exceptionReport.setExceptionClass("test class");
@@ -51,7 +51,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash("test message hash");
     exceptionReport.setExceptionClass("test class");
@@ -78,7 +78,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     ExceptionReport exceptionReportOne = new ExceptionReport();
     exceptionReportOne.setMessageHash("test message hash");
     exceptionReportOne.setExceptionClass("test class");
@@ -121,7 +121,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash("test message hash");
     exceptionReport.setExceptionClass("test class");
@@ -137,11 +137,35 @@ public class CachingDataStoreTest {
   }
 
   @Test
+  public void testShouldWeLogAfterRetries() {
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 1);
+    ExceptionReport exceptionReport = new ExceptionReport();
+    exceptionReport.setMessageHash("test message hash");
+    exceptionReport.setExceptionClass("test class");
+    exceptionReport.setExceptionMessage("test exception message");
+    exceptionReport.setQueue("test queue");
+    exceptionReport.setService("test service");
+
+    assertThat(underTest.shouldWeLogThisMessage(exceptionReport)).isFalse();
+
+    underTest.updateStats(exceptionReport);
+
+    assertThat(underTest.shouldWeLogThisMessage(exceptionReport)).isTrue();
+
+    underTest.updateStats(exceptionReport);
+
+    assertThat(underTest.shouldWeLogThisMessage(exceptionReport)).isFalse();
+  }
+
+  @Test
   public void testShouldWeSkip() {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash("test message hash");
     exceptionReport.setExceptionClass("test class");
@@ -167,7 +191,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRule rule = new AutoQuarantineRule();
     rule.setExpression("exceptionClass == \"test class\" and queue == \"test queue\"");
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.singletonList(rule));
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash("test message hash");
     exceptionReport.setExceptionClass("test class");
@@ -185,7 +209,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRule rule = new AutoQuarantineRule();
     rule.setExpression("exceptionMessage.contains('message')");
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.singletonList(rule));
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash("test message hash");
     exceptionReport.setExceptionClass("test class");
@@ -203,7 +227,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRule rule = new AutoQuarantineRule();
     rule.setExpression("exceptionClass == \"noodle\" and queue == \"test queue\"");
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.singletonList(rule));
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash("test message hash");
     exceptionReport.setExceptionClass("test class");
@@ -219,7 +243,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     ExceptionReport exceptionReport = new ExceptionReport();
     exceptionReport.setMessageHash("test message hash");
     exceptionReport.setExceptionClass("test class");
@@ -243,7 +267,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     ExceptionReport exceptionReportOne = new ExceptionReport();
     exceptionReportOne.setMessageHash("test message hash");
     exceptionReportOne.setExceptionClass("test class");
@@ -274,7 +298,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     Peek peek = new Peek();
     peek.setMessageHash("test message hash");
     peek.setMessagePayload("test message".getBytes());
@@ -289,7 +313,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     SkippedMessage skippedMessage = new SkippedMessage();
     skippedMessage.setMessageHash("test message hash");
     underTest.storeSkippedMessage(skippedMessage);
@@ -305,7 +329,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     SkippedMessage skippedMessageOne = new SkippedMessage();
     skippedMessageOne.setMessageHash("test message hash");
     skippedMessageOne.setQueue("test queue one");
@@ -325,7 +349,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     SkippedMessage skippedMessageOne = new SkippedMessage();
     skippedMessageOne.setMessageHash("test message hash");
     skippedMessageOne.setQueue("test queue one");
@@ -396,7 +420,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(expectedAutoQuarantineRules);
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
 
     // When
     List<AutoQuarantineRule> actualQuarantineRules = underTest.getQuarantineRules();
@@ -411,7 +435,7 @@ public class CachingDataStoreTest {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(expectedAutoQuarantineRules);
-    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository);
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     UUID testId = UUID.randomUUID();
 
     // When

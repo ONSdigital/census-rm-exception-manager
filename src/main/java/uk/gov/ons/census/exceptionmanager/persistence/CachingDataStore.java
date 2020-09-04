@@ -9,8 +9,10 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
@@ -36,9 +38,14 @@ public class CachingDataStore {
   private Map<String, List<SkippedMessage>> skippedMessages = new HashMap<>();
   private List<Expression> autoQuarantineExpressions = new LinkedList<>();
   private final AutoQuarantineRuleRepository quarantineRuleRepository;
+  private final int numberOfRetriesBeforeLogging;
 
-  public CachingDataStore(AutoQuarantineRuleRepository quarantineRuleRepository) {
+  public CachingDataStore(
+      AutoQuarantineRuleRepository quarantineRuleRepository,
+      @Value("${general-config.number-of-retries-before-logging}")
+          int numberOfRetriesBeforeLogging) {
     this.quarantineRuleRepository = quarantineRuleRepository;
+    this.numberOfRetriesBeforeLogging = numberOfRetriesBeforeLogging;
 
     List<AutoQuarantineRule> autoQuarantineRules = quarantineRuleRepository.findAll();
 
@@ -68,7 +75,21 @@ public class CachingDataStore {
   }
 
   public boolean shouldWeLogThisMessage(ExceptionReport exceptionReport) {
-    return seenExceptions.get(exceptionReport) == null;
+    ExceptionStats exceptionStats = seenExceptions.get(exceptionReport);
+
+    if (numberOfRetriesBeforeLogging > 0) {
+      // Don't log until we've seen the exception a [configurable] number of times
+      if (exceptionStats != null
+          && !exceptionStats.isLoggedAtLeastOnce()
+          && exceptionStats.getSeenCount().get() > numberOfRetriesBeforeLogging - 1) {
+        exceptionStats.setLoggedAtLeastOnce(true);
+        return true;
+      }
+
+      return false;
+    } else {
+      return exceptionStats == null;
+    }
   }
 
   public boolean shouldWeSkipThisMessage(ExceptionReport exceptionReport) {
@@ -96,6 +117,18 @@ public class CachingDataStore {
 
   public Set<String> getSeenMessageHashes() {
     return messageExceptionReports.keySet();
+  }
+
+  public Set<String> getSeenMessageHashes(int minimumSeenCount) {
+    Set<String> result = new HashSet<>();
+
+    for (Entry<ExceptionReport, ExceptionStats> item : seenExceptions.entrySet()) {
+      if (item.getValue().getSeenCount().get() >= minimumSeenCount) {
+        result.add(item.getKey().getMessageHash());
+      }
+    }
+
+    return result;
   }
 
   public void skipMessage(String messageHash) {

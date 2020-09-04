@@ -9,4 +9,5 @@ public class ExceptionStats {
   private Instant firstSeen = Instant.now();
   private Instant lastSeen = Instant.now();
   private AtomicInteger seenCount = new AtomicInteger(1);
+  private boolean loggedAtLeastOnce = false;
 }

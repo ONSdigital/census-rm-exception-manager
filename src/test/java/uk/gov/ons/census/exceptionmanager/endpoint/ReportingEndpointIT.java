@@ -3,10 +3,12 @@ package uk.gov.ons.census.exceptionmanager.endpoint;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpStatus.OK;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
+import com.mashape.unirest.http.exceptions.UnirestException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,22 +53,7 @@ public class ReportingEndpointIT {
 
   @Test
   public void testReportException() throws Exception {
-    ExceptionReport exceptionReport = new ExceptionReport();
-    exceptionReport.setMessageHash(TEST_MESSAGE_HASH);
-    exceptionReport.setService("test service");
-    exceptionReport.setQueue("test queue");
-    exceptionReport.setExceptionClass("test class");
-    exceptionReport.setExceptionMessage("test message");
-    exceptionReport.setExceptionRootCause("test root cause");
-
-    Map<String, String> headers = new HashMap<>();
-    headers.put("accept", "application/json");
-    headers.put("Content-Type", "application/json");
-    HttpResponse<String> response =
-        Unirest.post(String.format("http://localhost:%d/reportexception", port))
-            .headers(headers)
-            .body(objectMapper.writeValueAsString(exceptionReport))
-            .asString();
+    HttpResponse<String> response = reportException(port, TEST_MESSAGE_HASH);
 
     assertThat(response.getStatus()).isEqualTo(OK.value());
 
@@ -180,5 +167,24 @@ public class ReportingEndpointIT {
     assertThat(quarantinedMessage.getService()).isEqualTo(skippedMessage.getService());
     assertThat(quarantinedMessage.getSkippedTimestamp()).isNotNull();
     assertThat(quarantinedMessage.getErrorReports()).isNotBlank();
+  }
+
+  public static HttpResponse<String> reportException(int port, String messageHash)
+      throws JsonProcessingException, UnirestException {
+    ExceptionReport exceptionReport = new ExceptionReport();
+    exceptionReport.setMessageHash(messageHash);
+    exceptionReport.setService("test service");
+    exceptionReport.setQueue("test queue");
+    exceptionReport.setExceptionClass("test class");
+    exceptionReport.setExceptionMessage("test message");
+    exceptionReport.setExceptionRootCause("test root cause");
+
+    Map<String, String> headers = new HashMap<>();
+    headers.put("accept", "application/json");
+    headers.put("Content-Type", "application/json");
+    return Unirest.post(String.format("http://localhost:%d/reportexception", port))
+        .headers(headers)
+        .body(objectMapper.writeValueAsString(exceptionReport))
+        .asString();
   }
 }

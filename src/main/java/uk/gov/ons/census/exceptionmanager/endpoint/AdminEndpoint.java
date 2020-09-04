@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import uk.gov.ons.census.exceptionmanager.model.dto.AutoQuarantineRule;
 import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageReport;
@@ -52,12 +53,25 @@ public class AdminEndpoint {
   }
 
   @GetMapping(path = "/badmessages")
-  public ResponseEntity<Set<String>> getBadMessages() {
-    return ResponseEntity.status(HttpStatus.OK).body(cachingDataStore.getSeenMessageHashes());
+  public ResponseEntity<Set<String>> getBadMessages(
+      @RequestParam(value = "minimumSeenCount", required = false, defaultValue = "-1")
+          int minimumSeenCount) {
+    Set<String> hashes;
+
+    // -1 means "no minimum"
+    if (minimumSeenCount == -1) {
+      hashes = cachingDataStore.getSeenMessageHashes();
+    } else {
+      hashes = cachingDataStore.getSeenMessageHashes(minimumSeenCount);
+    }
+
+    return ResponseEntity.status(HttpStatus.OK).body(hashes);
   }
 
   @GetMapping(path = "/badmessages/summary")
-  public ResponseEntity<List<BadMessageSummary>> getBadMessagesSummary() {
+  public ResponseEntity<List<BadMessageSummary>> getBadMessagesSummary(
+      @RequestParam(value = "minimumSeenCount", required = false, defaultValue = "-1")
+          int minimumSeenCount) {
     List<BadMessageSummary> badMessageSummaryList = new LinkedList<>();
     for (String messageHash : cachingDataStore.getSeenMessageHashes()) {
       BadMessageSummary badMessageSummary = new BadMessageSummary();
@@ -71,18 +85,20 @@ public class AdminEndpoint {
       Set<String> affectedQueues = new HashSet<>();
 
       for (BadMessageReport badMessageReport : cachingDataStore.getBadMessageReports(messageHash)) {
-        if (badMessageReport.getStats().getFirstSeen().isBefore(firstSeen)) {
-          firstSeen = badMessageReport.getStats().getFirstSeen();
+        if (badMessageReport.getStats().getSeenCount().get() >= minimumSeenCount) {
+          if (badMessageReport.getStats().getFirstSeen().isBefore(firstSeen)) {
+            firstSeen = badMessageReport.getStats().getFirstSeen();
+          }
+
+          if (badMessageReport.getStats().getLastSeen().isAfter(lastSeen)) {
+            lastSeen = badMessageReport.getStats().getLastSeen();
+          }
+
+          seenCount += badMessageReport.getStats().getSeenCount().get();
+
+          affectedServices.add(badMessageReport.getExceptionReport().getService());
+          affectedQueues.add(badMessageReport.getExceptionReport().getQueue());
         }
-
-        if (badMessageReport.getStats().getLastSeen().isAfter(lastSeen)) {
-          lastSeen = badMessageReport.getStats().getLastSeen();
-        }
-
-        seenCount += badMessageReport.getStats().getSeenCount().get();
-
-        affectedServices.add(badMessageReport.getExceptionReport().getService());
-        affectedQueues.add(badMessageReport.getExceptionReport().getQueue());
       }
 
       badMessageSummary.setFirstSeen(firstSeen);

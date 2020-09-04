@@ -40,7 +40,7 @@ public class AdminEndpointTest {
     AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
-    ResponseEntity<Set<String>> actualResponse = underTest.getBadMessages();
+    ResponseEntity<Set<String>> actualResponse = underTest.getBadMessages(-1);
 
     // Then
     assertThat(actualResponse.getBody()).isEqualTo(testSet);
@@ -67,7 +67,7 @@ public class AdminEndpointTest {
     AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
-    ResponseEntity<List<BadMessageSummary>> actualResponse = underTest.getBadMessagesSummary();
+    ResponseEntity<List<BadMessageSummary>> actualResponse = underTest.getBadMessagesSummary(-1);
 
     // Then
     verify(cachingDataStore).getSeenMessageHashes();

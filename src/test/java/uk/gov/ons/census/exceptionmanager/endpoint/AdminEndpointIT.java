@@ -2,6 +2,7 @@ package uk.gov.ons.census.exceptionmanager.endpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpStatus.OK;
+import static uk.gov.ons.census.exceptionmanager.endpoint.ReportingEndpointIT.reportException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mashape.unirest.http.HttpResponse;
@@ -64,6 +65,38 @@ public class AdminEndpointIT {
 
     Set actualResponse = objectMapper.readValue(response.getBody(), Set.class);
     assertThat(actualResponse.size()).isEqualTo(0);
+  }
+
+  @Test
+  public void testGetBadMessagesMinimumSeenCount() throws Exception {
+    reportException(port, TEST_MESSAGE_HASH);
+
+    Map<String, String> headers = new HashMap<>();
+    headers.put("accept", "application/json");
+    headers.put("Content-Type", "application/json");
+    HttpResponse<String> response =
+        Unirest.get(String.format("http://localhost:%d/badmessages?minimumSeenCount=2", port))
+            .headers(headers)
+            .asString();
+
+    assertThat(response.getStatus()).isEqualTo(OK.value());
+
+    Set actualResponse = objectMapper.readValue(response.getBody(), Set.class);
+    assertThat(actualResponse.size()).isEqualTo(0);
+
+    // Now report a second exception
+    reportException(port, TEST_MESSAGE_HASH);
+
+    response =
+        Unirest.get(String.format("http://localhost:%d/badmessages?minimumSeenCount=2", port))
+            .headers(headers)
+            .asString();
+
+    assertThat(response.getStatus()).isEqualTo(OK.value());
+
+    actualResponse = objectMapper.readValue(response.getBody(), Set.class);
+    assertThat(actualResponse.size()).isEqualTo(1);
+    assertThat(actualResponse).containsExactly(TEST_MESSAGE_HASH);
   }
 
   @Test
