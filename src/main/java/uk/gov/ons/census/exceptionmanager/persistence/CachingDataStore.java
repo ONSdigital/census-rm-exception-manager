@@ -4,7 +4,6 @@ import com.godaddy.logging.Logger;
 import com.godaddy.logging.LoggerFactory;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -12,6 +11,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
@@ -30,12 +30,12 @@ import uk.gov.ons.census.exceptionmanager.model.repository.AutoQuarantineRuleRep
 @Component
 public class CachingDataStore {
   private static final Logger log = LoggerFactory.getLogger(CachingDataStore.class);
-  private Map<ExceptionReport, ExceptionStats> seenExceptions = new HashMap<>();
-  private Map<String, List<ExceptionReport>> messageExceptionReports = new HashMap<>();
-  private Set<String> messagesToSkip = new HashSet<>();
-  private Set<String> messagesToPeek = new HashSet<>();
-  private Map<String, byte[]> peekedMessages = new HashMap<>();
-  private Map<String, List<SkippedMessage>> skippedMessages = new HashMap<>();
+  private Map<ExceptionReport, ExceptionStats> seenExceptions = new ConcurrentHashMap<>();
+  private Map<String, List<ExceptionReport>> messageExceptionReports = new ConcurrentHashMap<>();
+  private Set<String> messagesToSkip = ConcurrentHashMap.newKeySet();
+  private Set<String> messagesToPeek = ConcurrentHashMap.newKeySet();
+  private Map<String, byte[]> peekedMessages = new ConcurrentHashMap<>();
+  private Map<String, List<SkippedMessage>> skippedMessages = new ConcurrentHashMap<>();
   private List<Expression> autoQuarantineExpressions = new LinkedList<>();
   private final AutoQuarantineRuleRepository quarantineRuleRepository;
   private final int numberOfRetriesBeforeLogging;
