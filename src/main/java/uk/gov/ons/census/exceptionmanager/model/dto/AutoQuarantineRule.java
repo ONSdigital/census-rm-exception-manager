@@ -6,7 +6,7 @@ import lombok.Data;
 @Data
 public class AutoQuarantineRule {
   private String expression;
-  private boolean doNotLog;
+  private boolean suppressLogging;
   private boolean quarantine;
   private boolean throwAway;
   private OffsetDateTime ruleExpiryDateTime;

@@ -15,7 +15,7 @@ public class AutoQuarantineRule {
   @Column private String expression;
 
   @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT false")
-  private boolean doNotLog;
+  private boolean suppressLogging;
 
   @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT false")
   private boolean quarantine;

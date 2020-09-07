@@ -168,7 +168,7 @@ public class AdminEndpoint {
                   AutoQuarantineRule mappedRule = new AutoQuarantineRule();
                   mappedRule.setExpression(rule.getExpression());
                   mappedRule.setQuarantine(rule.isQuarantine());
-                  mappedRule.setDoNotLog(rule.isDoNotLog());
+                  mappedRule.setSuppressLogging(rule.isSuppressLogging());
                   mappedRule.setThrowAway(rule.isThrowAway());
                   mappedRule.setRuleExpiryDateTime(rule.getRuleExpiryDateTime());
                   return mappedRule;
@@ -182,7 +182,7 @@ public class AdminEndpoint {
   public void addQuarantineRule(@RequestBody AutoQuarantineRule autoQuarantineRule) {
     cachingDataStore.addQuarantineRuleExpression(
         autoQuarantineRule.getExpression(),
-        autoQuarantineRule.isDoNotLog(),
+        autoQuarantineRule.isSuppressLogging(),
         autoQuarantineRule.isQuarantine(),
         autoQuarantineRule.isThrowAway(),
         autoQuarantineRule.getRuleExpiryDateTime());

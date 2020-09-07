@@ -114,7 +114,7 @@ public class CachingDataStore {
         Boolean expressionResult = expression.getValue(context, Boolean.class);
         if (expressionResult != null && expressionResult) {
 
-          if (!autoQuarantineRule.isDoNotLog() && !autoQuarantineRule.isThrowAway()) {
+          if (!autoQuarantineRule.isSuppressLogging() && !autoQuarantineRule.isThrowAway()) {
             log.with("exception_report", exceptionReport)
                 .with("expression", expression.getExpressionString())
                 .warn("Auto-quarantine message rule matched");
@@ -228,7 +228,7 @@ public class CachingDataStore {
     AutoQuarantineRule autoQuarantineRule = new AutoQuarantineRule();
     autoQuarantineRule.setId(UUID.randomUUID());
     autoQuarantineRule.setExpression(expression);
-    autoQuarantineRule.setDoNotLog(doNotLog);
+    autoQuarantineRule.setSuppressLogging(doNotLog);
     autoQuarantineRule.setQuarantine(quarantine);
     autoQuarantineRule.setThrowAway(throwAway);
     autoQuarantineRule.setRuleExpiryDateTime(ruleExpiryDateTime);

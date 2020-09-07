@@ -45,7 +45,7 @@ public class ReportingEndpoint {
         result.setThrowAway(true); // Don't log, don't quarantine... completely silent
       }
 
-      if (rule.isDoNotLog()) {
+      if (rule.isSuppressLogging()) {
         shouldLog = false;
       }
 
