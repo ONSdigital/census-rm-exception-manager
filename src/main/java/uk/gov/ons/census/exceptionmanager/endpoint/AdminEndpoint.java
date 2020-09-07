@@ -167,6 +167,10 @@ public class AdminEndpoint {
                 rule -> {
                   AutoQuarantineRule mappedRule = new AutoQuarantineRule();
                   mappedRule.setExpression(rule.getExpression());
+                  mappedRule.setQuarantine(rule.isQuarantine());
+                  mappedRule.setDoNotLog(rule.isDoNotLog());
+                  mappedRule.setThrowAway(rule.isThrowAway());
+                  mappedRule.setRuleExpiryDateTime(rule.getRuleExpiryDateTime());
                   return mappedRule;
                 })
             .collect(Collectors.toList());
