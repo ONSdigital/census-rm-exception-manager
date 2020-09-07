@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -207,10 +208,13 @@ public class AdminEndpointTest {
     // When
     AutoQuarantineRule autoQuarantineRule = new AutoQuarantineRule();
     autoQuarantineRule.setExpression("true");
+    autoQuarantineRule.setRuleExpiryDateTime(OffsetDateTime.MAX);
     underTest.addQuarantineRule(autoQuarantineRule);
 
     // Then
-    verify(cachingDataStore).addQuarantineRuleExpression(eq("true"));
+    verify(cachingDataStore)
+        .addQuarantineRuleExpression(
+            eq("true"), eq(false), eq(false), eq(false), any(OffsetDateTime.class));
   }
 
   @Test

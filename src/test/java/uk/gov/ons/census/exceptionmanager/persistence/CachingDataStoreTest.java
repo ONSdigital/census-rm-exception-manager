@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -185,10 +186,12 @@ public class CachingDataStoreTest {
   }
 
   @Test
-  public void testShouldWeSkipAutoQuarantineMatch() {
+  public void testAutoQuarantineMatch() {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     AutoQuarantineRule rule = new AutoQuarantineRule();
+    rule.setQuarantine(true);
+    rule.setRuleExpiryDateTime(OffsetDateTime.MAX);
     rule.setExpression("exceptionClass == \"test class\" and queue == \"test queue\"");
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.singletonList(rule));
     CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
@@ -199,15 +202,19 @@ public class CachingDataStoreTest {
     exceptionReport.setQueue("test queue");
     exceptionReport.setService("test service");
 
-    assertThat(underTest.shouldWeSkipThisMessage(exceptionReport)).isTrue();
+    List<AutoQuarantineRule> matchingRules = underTest.findMatchingRules(exceptionReport);
+    assertThat(matchingRules.size()).isEqualTo(1);
+    assertThat(matchingRules.get(0).isQuarantine()).isTrue();
   }
 
   @Test
-  public void testShouldWeSkipAutoQuarantineMatchSubstring() {
+  public void testfindMatchingRulesMatchSubstring() {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     AutoQuarantineRule rule = new AutoQuarantineRule();
     rule.setExpression("exceptionMessage.contains('message')");
+    rule.setQuarantine(true);
+    rule.setRuleExpiryDateTime(OffsetDateTime.MAX);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.singletonList(rule));
     CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     ExceptionReport exceptionReport = new ExceptionReport();
@@ -217,7 +224,9 @@ public class CachingDataStoreTest {
     exceptionReport.setQueue("test queue");
     exceptionReport.setService("test service");
 
-    assertThat(underTest.shouldWeSkipThisMessage(exceptionReport)).isTrue();
+    List<AutoQuarantineRule> matchingRules = underTest.findMatchingRules(exceptionReport);
+    assertThat(matchingRules.size()).isEqualTo(1);
+    assertThat(matchingRules.get(0).isQuarantine()).isTrue();
   }
 
   @Test
@@ -225,7 +234,9 @@ public class CachingDataStoreTest {
     AutoQuarantineRuleRepository autoQuarantineRuleRepository =
         mock(AutoQuarantineRuleRepository.class);
     AutoQuarantineRule rule = new AutoQuarantineRule();
+    rule.setQuarantine(true);
     rule.setExpression("exceptionClass == \"noodle\" and queue == \"test queue\"");
+    rule.setRuleExpiryDateTime(OffsetDateTime.MAX);
     when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.singletonList(rule));
     CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
     ExceptionReport exceptionReport = new ExceptionReport();
@@ -235,7 +246,8 @@ public class CachingDataStoreTest {
     exceptionReport.setQueue("test queue");
     exceptionReport.setService("test service");
 
-    assertThat(underTest.shouldWeSkipThisMessage(exceptionReport)).isFalse();
+    List<AutoQuarantineRule> matchingRules = underTest.findMatchingRules(exceptionReport);
+    assertThat(matchingRules.size()).isEqualTo(0);
   }
 
   @Test

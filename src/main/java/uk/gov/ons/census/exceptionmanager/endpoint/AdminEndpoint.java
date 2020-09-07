@@ -176,7 +176,12 @@ public class AdminEndpoint {
   @Transactional
   @PostMapping(path = "/quarantinerule")
   public void addQuarantineRule(@RequestBody AutoQuarantineRule autoQuarantineRule) {
-    cachingDataStore.addQuarantineRuleExpression(autoQuarantineRule.getExpression());
+    cachingDataStore.addQuarantineRuleExpression(
+        autoQuarantineRule.getExpression(),
+        autoQuarantineRule.isDoNotLog(),
+        autoQuarantineRule.isQuarantine(),
+        autoQuarantineRule.isThrowAway(),
+        autoQuarantineRule.getRuleExpiryDateTime());
   }
 
   @Transactional

@@ -3,6 +3,7 @@ package uk.gov.ons.census.exceptionmanager.persistence;
 import com.godaddy.logging.Logger;
 import com.godaddy.logging.LoggerFactory;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -36,7 +37,7 @@ public class CachingDataStore {
   private Set<String> messagesToPeek = ConcurrentHashMap.newKeySet();
   private Map<String, byte[]> peekedMessages = new ConcurrentHashMap<>();
   private Map<String, List<SkippedMessage>> skippedMessages = new ConcurrentHashMap<>();
-  private List<Expression> autoQuarantineExpressions = new LinkedList<>();
+  private Map<AutoQuarantineRule, Expression> autoQuarantineExpressions = new ConcurrentHashMap<>();
   private final AutoQuarantineRuleRepository quarantineRuleRepository;
   private final int numberOfRetriesBeforeLogging;
 
@@ -52,7 +53,7 @@ public class CachingDataStore {
     for (AutoQuarantineRule rule : autoQuarantineRules) {
       ExpressionParser expressionParser = new SpelExpressionParser();
       Expression spelExpression = expressionParser.parseExpression(rule.getExpression());
-      autoQuarantineExpressions.add(spelExpression);
+      autoQuarantineExpressions.put(rule, spelExpression);
     }
   }
 
@@ -93,15 +94,33 @@ public class CachingDataStore {
   }
 
   public boolean shouldWeSkipThisMessage(ExceptionReport exceptionReport) {
+    return messagesToSkip.contains(exceptionReport.getMessageHash());
+  }
+
+  public List<AutoQuarantineRule> findMatchingRules(ExceptionReport exceptionReport) {
+    List<AutoQuarantineRule> matchingRules = new LinkedList<>();
+
     EvaluationContext context = new StandardEvaluationContext(exceptionReport);
-    for (Expression expression : autoQuarantineExpressions) {
+    for (Entry<AutoQuarantineRule, Expression> ruleExpressionEntry :
+        autoQuarantineExpressions.entrySet()) {
+      Expression expression = ruleExpressionEntry.getValue();
+      AutoQuarantineRule autoQuarantineRule = ruleExpressionEntry.getKey();
+
+      if (OffsetDateTime.now().isAfter(autoQuarantineRule.getRuleExpiryDateTime())) {
+        continue; // This rule has expired, so it can not match
+      }
+
       try {
         Boolean expressionResult = expression.getValue(context, Boolean.class);
         if (expressionResult != null && expressionResult) {
-          log.with("exception_report", exceptionReport)
-              .with("expression", expression.getExpressionString())
-              .warn("Auto-quarantine message rule matched");
-          return true;
+
+          if (!autoQuarantineRule.isDoNotLog() && !autoQuarantineRule.isThrowAway()) {
+            log.with("exception_report", exceptionReport)
+                .with("expression", expression.getExpressionString())
+                .warn("Auto-quarantine message rule matched");
+          }
+
+          matchingRules.add(autoQuarantineRule);
         }
       } catch (Exception e) {
         log.with("exception_report", exceptionReport)
@@ -110,7 +129,7 @@ public class CachingDataStore {
       }
     }
 
-    return messagesToSkip.contains(exceptionReport.getMessageHash());
+    return matchingRules;
   }
 
   public boolean isQuarantined(String messageHash) {
@@ -197,16 +216,26 @@ public class CachingDataStore {
     peekedMessages.clear();
   }
 
-  public void addQuarantineRuleExpression(String expression) {
+  public void addQuarantineRuleExpression(
+      String expression,
+      boolean doNotLog,
+      boolean quarantine,
+      boolean throwAway,
+      OffsetDateTime ruleExpiryDateTime) {
     ExpressionParser expressionParser = new SpelExpressionParser();
     Expression spelExpression = expressionParser.parseExpression(expression);
 
     AutoQuarantineRule autoQuarantineRule = new AutoQuarantineRule();
     autoQuarantineRule.setId(UUID.randomUUID());
     autoQuarantineRule.setExpression(expression);
+    autoQuarantineRule.setDoNotLog(doNotLog);
+    autoQuarantineRule.setQuarantine(quarantine);
+    autoQuarantineRule.setThrowAway(throwAway);
+    autoQuarantineRule.setRuleExpiryDateTime(ruleExpiryDateTime);
+
     quarantineRuleRepository.saveAndFlush(autoQuarantineRule);
 
-    autoQuarantineExpressions.add(spelExpression);
+    autoQuarantineExpressions.put(autoQuarantineRule, spelExpression);
   }
 
   public List<AutoQuarantineRule> getQuarantineRules() {
@@ -216,13 +245,11 @@ public class CachingDataStore {
   public void deleteQuarantineRule(String id) {
     quarantineRuleRepository.deleteById(UUID.fromString(id));
     List<AutoQuarantineRule> rules = quarantineRuleRepository.findAll();
-    List<Expression> newRules = new LinkedList<>();
+    autoQuarantineExpressions.clear();
     for (AutoQuarantineRule rule : rules) {
       ExpressionParser expressionParser = new SpelExpressionParser();
       Expression spelExpression = expressionParser.parseExpression(rule.getExpression());
-      newRules.add(spelExpression);
+      autoQuarantineExpressions.put(rule, spelExpression);
     }
-
-    autoQuarantineExpressions = newRules;
   }
 }
