@@ -3,7 +3,7 @@ server:
 
 info:
   app:
-    name: Bad Message Handler
+    name: Exception Manager
     version: 1.0
 
 spring:
@@ -43,3 +43,6 @@ management:
 
 peek:
   timeout: 30000 # milliseconds
+
+general-config:
+  number-of-retries-before-logging: 1

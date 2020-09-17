@@ -4,3 +4,6 @@ spring:
 
   rabbitmq:
     port: 35672
+
+general-config:
+  number-of-retries-before-logging: 0

@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import uk.gov.ons.census.exceptionmanager.model.dto.AutoQuarantineRule;
 import uk.gov.ons.census.exceptionmanager.model.dto.BadMessageReport;
@@ -52,14 +53,20 @@ public class AdminEndpoint {
   }
 
   @GetMapping(path = "/badmessages")
-  public ResponseEntity<Set<String>> getBadMessages() {
-    return ResponseEntity.status(HttpStatus.OK).body(cachingDataStore.getSeenMessageHashes());
+  public ResponseEntity<Set<String>> getBadMessages(
+      @RequestParam(value = "minimumSeenCount", required = false, defaultValue = "-1")
+          int minimumSeenCount) {
+    return ResponseEntity.status(HttpStatus.OK).body(getSeenMessageHashes(minimumSeenCount));
   }
 
   @GetMapping(path = "/badmessages/summary")
-  public ResponseEntity<List<BadMessageSummary>> getBadMessagesSummary() {
+  public ResponseEntity<List<BadMessageSummary>> getBadMessagesSummary(
+      @RequestParam(value = "minimumSeenCount", required = false, defaultValue = "-1")
+          int minimumSeenCount) {
     List<BadMessageSummary> badMessageSummaryList = new LinkedList<>();
-    for (String messageHash : cachingDataStore.getSeenMessageHashes()) {
+    Set<String> hashes = getSeenMessageHashes(minimumSeenCount);
+
+    for (String messageHash : hashes) {
       BadMessageSummary badMessageSummary = new BadMessageSummary();
       badMessageSummary.setMessageHash(messageHash);
       badMessageSummaryList.add(badMessageSummary);
@@ -160,6 +167,10 @@ public class AdminEndpoint {
                 rule -> {
                   AutoQuarantineRule mappedRule = new AutoQuarantineRule();
                   mappedRule.setExpression(rule.getExpression());
+                  mappedRule.setQuarantine(rule.isQuarantine());
+                  mappedRule.setSuppressLogging(rule.isSuppressLogging());
+                  mappedRule.setThrowAway(rule.isThrowAway());
+                  mappedRule.setRuleExpiryDateTime(rule.getRuleExpiryDateTime());
                   return mappedRule;
                 })
             .collect(Collectors.toList());
@@ -169,7 +180,12 @@ public class AdminEndpoint {
   @Transactional
   @PostMapping(path = "/quarantinerule")
   public void addQuarantineRule(@RequestBody AutoQuarantineRule autoQuarantineRule) {
-    cachingDataStore.addQuarantineRuleExpression(autoQuarantineRule.getExpression());
+    cachingDataStore.addQuarantineRuleExpression(
+        autoQuarantineRule.getExpression(),
+        autoQuarantineRule.isSuppressLogging(),
+        autoQuarantineRule.isQuarantine(),
+        autoQuarantineRule.isThrowAway(),
+        autoQuarantineRule.getRuleExpiryDateTime());
   }
 
   @Transactional
@@ -207,5 +223,18 @@ public class AdminEndpoint {
         quarantinedMessage.getQueue(), quarantinedMessage.getMessagePayload(), mpp);
 
     quarantinedMessageRepository.delete(quarantinedMessage);
+  }
+
+  private Set<String> getSeenMessageHashes(int minimumSeenCount) {
+    Set<String> hashes;
+
+    // -1 means "no minimum"
+    if (minimumSeenCount == -1) {
+      hashes = cachingDataStore.getSeenMessageHashes();
+    } else {
+      hashes = cachingDataStore.getSeenMessageHashes(minimumSeenCount);
+    }
+
+    return hashes;
   }
 }

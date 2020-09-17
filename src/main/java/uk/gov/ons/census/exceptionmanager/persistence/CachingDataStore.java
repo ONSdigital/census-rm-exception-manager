@@ -3,14 +3,17 @@ package uk.gov.ons.census.exceptionmanager.persistence;
 import com.godaddy.logging.Logger;
 import com.godaddy.logging.LoggerFactory;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
@@ -28,24 +31,29 @@ import uk.gov.ons.census.exceptionmanager.model.repository.AutoQuarantineRuleRep
 @Component
 public class CachingDataStore {
   private static final Logger log = LoggerFactory.getLogger(CachingDataStore.class);
-  private Map<ExceptionReport, ExceptionStats> seenExceptions = new HashMap<>();
-  private Map<String, List<ExceptionReport>> messageExceptionReports = new HashMap<>();
-  private Set<String> messagesToSkip = new HashSet<>();
-  private Set<String> messagesToPeek = new HashSet<>();
-  private Map<String, byte[]> peekedMessages = new HashMap<>();
-  private Map<String, List<SkippedMessage>> skippedMessages = new HashMap<>();
-  private List<Expression> autoQuarantineExpressions = new LinkedList<>();
+  private Map<ExceptionReport, ExceptionStats> seenExceptions = new ConcurrentHashMap<>();
+  private Map<String, List<ExceptionReport>> messageExceptionReports = new ConcurrentHashMap<>();
+  private Set<String> messagesToSkip = ConcurrentHashMap.newKeySet();
+  private Set<String> messagesToPeek = ConcurrentHashMap.newKeySet();
+  private Map<String, byte[]> peekedMessages = new ConcurrentHashMap<>();
+  private Map<String, List<SkippedMessage>> skippedMessages = new ConcurrentHashMap<>();
+  private Map<AutoQuarantineRule, Expression> autoQuarantineExpressions = new ConcurrentHashMap<>();
   private final AutoQuarantineRuleRepository quarantineRuleRepository;
+  private final int numberOfRetriesBeforeLogging;
 
-  public CachingDataStore(AutoQuarantineRuleRepository quarantineRuleRepository) {
+  public CachingDataStore(
+      AutoQuarantineRuleRepository quarantineRuleRepository,
+      @Value("${general-config.number-of-retries-before-logging}")
+          int numberOfRetriesBeforeLogging) {
     this.quarantineRuleRepository = quarantineRuleRepository;
+    this.numberOfRetriesBeforeLogging = numberOfRetriesBeforeLogging;
 
     List<AutoQuarantineRule> autoQuarantineRules = quarantineRuleRepository.findAll();
 
     for (AutoQuarantineRule rule : autoQuarantineRules) {
       ExpressionParser expressionParser = new SpelExpressionParser();
       Expression spelExpression = expressionParser.parseExpression(rule.getExpression());
-      autoQuarantineExpressions.add(spelExpression);
+      autoQuarantineExpressions.put(rule, spelExpression);
     }
   }
 
@@ -68,22 +76,60 @@ public class CachingDataStore {
   }
 
   public boolean shouldWeLogThisMessage(ExceptionReport exceptionReport) {
-    return seenExceptions.get(exceptionReport) == null;
+    ExceptionStats exceptionStats = seenExceptions.get(exceptionReport);
+
+    if (numberOfRetriesBeforeLogging > 0) {
+      // Don't log until we've seen the exception a [configurable] number of times
+      if (exceptionStats != null
+          && !exceptionStats.isLoggedAtLeastOnce()
+          && exceptionStats.getSeenCount().get() > numberOfRetriesBeforeLogging - 1) {
+        exceptionStats.setLoggedAtLeastOnce(true);
+        return true;
+      }
+
+      return false;
+    } else {
+      return exceptionStats == null;
+    }
   }
 
   public boolean shouldWeSkipThisMessage(ExceptionReport exceptionReport) {
+    return messagesToSkip.contains(exceptionReport.getMessageHash());
+  }
+
+  public List<AutoQuarantineRule> findMatchingRules(ExceptionReport exceptionReport) {
+    List<AutoQuarantineRule> matchingRules = new LinkedList<>();
+
     EvaluationContext context = new StandardEvaluationContext(exceptionReport);
-    for (Expression expression : autoQuarantineExpressions) {
-      Boolean expressionResult = expression.getValue(context, Boolean.class);
-      if (expressionResult) {
+    for (Entry<AutoQuarantineRule, Expression> ruleExpressionEntry :
+        autoQuarantineExpressions.entrySet()) {
+      Expression expression = ruleExpressionEntry.getValue();
+      AutoQuarantineRule autoQuarantineRule = ruleExpressionEntry.getKey();
+
+      if (OffsetDateTime.now().isAfter(autoQuarantineRule.getRuleExpiryDateTime())) {
+        continue; // This rule has expired, so it can not match
+      }
+
+      try {
+        Boolean expressionResult = expression.getValue(context, Boolean.class);
+        if (expressionResult != null && expressionResult) {
+
+          if (!autoQuarantineRule.isSuppressLogging() && !autoQuarantineRule.isThrowAway()) {
+            log.with("exception_report", exceptionReport)
+                .with("expression", expression.getExpressionString())
+                .warn("Auto-quarantine message rule matched");
+          }
+
+          matchingRules.add(autoQuarantineRule);
+        }
+      } catch (Exception e) {
         log.with("exception_report", exceptionReport)
             .with("expression", expression.getExpressionString())
-            .warn("Auto-quarantine message rule matched");
-        return true;
+            .warn("Auto-quarantine rule is causing errors", e);
       }
     }
 
-    return messagesToSkip.contains(exceptionReport.getMessageHash());
+    return matchingRules;
   }
 
   public boolean isQuarantined(String messageHash) {
@@ -96,6 +142,18 @@ public class CachingDataStore {
 
   public Set<String> getSeenMessageHashes() {
     return messageExceptionReports.keySet();
+  }
+
+  public Set<String> getSeenMessageHashes(int minimumSeenCount) {
+    Set<String> result = new HashSet<>();
+
+    for (Entry<ExceptionReport, ExceptionStats> item : seenExceptions.entrySet()) {
+      if (item.getValue().getSeenCount().get() >= minimumSeenCount) {
+        result.add(item.getKey().getMessageHash());
+      }
+    }
+
+    return result;
   }
 
   public void skipMessage(String messageHash) {
@@ -158,16 +216,26 @@ public class CachingDataStore {
     peekedMessages.clear();
   }
 
-  public void addQuarantineRuleExpression(String expression) {
+  public void addQuarantineRuleExpression(
+      String expression,
+      boolean doNotLog,
+      boolean quarantine,
+      boolean throwAway,
+      OffsetDateTime ruleExpiryDateTime) {
     ExpressionParser expressionParser = new SpelExpressionParser();
     Expression spelExpression = expressionParser.parseExpression(expression);
 
     AutoQuarantineRule autoQuarantineRule = new AutoQuarantineRule();
     autoQuarantineRule.setId(UUID.randomUUID());
     autoQuarantineRule.setExpression(expression);
+    autoQuarantineRule.setSuppressLogging(doNotLog);
+    autoQuarantineRule.setQuarantine(quarantine);
+    autoQuarantineRule.setThrowAway(throwAway);
+    autoQuarantineRule.setRuleExpiryDateTime(ruleExpiryDateTime);
+
     quarantineRuleRepository.saveAndFlush(autoQuarantineRule);
 
-    autoQuarantineExpressions.add(spelExpression);
+    autoQuarantineExpressions.put(autoQuarantineRule, spelExpression);
   }
 
   public List<AutoQuarantineRule> getQuarantineRules() {
@@ -177,13 +245,11 @@ public class CachingDataStore {
   public void deleteQuarantineRule(String id) {
     quarantineRuleRepository.deleteById(UUID.fromString(id));
     List<AutoQuarantineRule> rules = quarantineRuleRepository.findAll();
-    List<Expression> newRules = new LinkedList<>();
+    autoQuarantineExpressions.clear();
     for (AutoQuarantineRule rule : rules) {
       ExpressionParser expressionParser = new SpelExpressionParser();
       Expression spelExpression = expressionParser.parseExpression(rule.getExpression());
-      newRules.add(spelExpression);
+      autoQuarantineExpressions.put(rule, spelExpression);
     }
-
-    autoQuarantineExpressions = newRules;
   }
 }

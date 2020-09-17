@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +41,7 @@ public class AdminEndpointTest {
     AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
-    ResponseEntity<Set<String>> actualResponse = underTest.getBadMessages();
+    ResponseEntity<Set<String>> actualResponse = underTest.getBadMessages(-1);
 
     // Then
     assertThat(actualResponse.getBody()).isEqualTo(testSet);
@@ -67,7 +68,7 @@ public class AdminEndpointTest {
     AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
-    ResponseEntity<List<BadMessageSummary>> actualResponse = underTest.getBadMessagesSummary();
+    ResponseEntity<List<BadMessageSummary>> actualResponse = underTest.getBadMessagesSummary(-1);
 
     // Then
     verify(cachingDataStore).getSeenMessageHashes();
@@ -207,10 +208,13 @@ public class AdminEndpointTest {
     // When
     AutoQuarantineRule autoQuarantineRule = new AutoQuarantineRule();
     autoQuarantineRule.setExpression("true");
+    autoQuarantineRule.setRuleExpiryDateTime(OffsetDateTime.MAX);
     underTest.addQuarantineRule(autoQuarantineRule);
 
     // Then
-    verify(cachingDataStore).addQuarantineRuleExpression(eq("true"));
+    verify(cachingDataStore)
+        .addQuarantineRuleExpression(
+            eq("true"), eq(false), eq(false), eq(false), any(OffsetDateTime.class));
   }
 
   @Test
