@@ -55,7 +55,7 @@ public class ReportingEndpointIT {
   @Before
   public void setUp() {
     quarantinedMessageRepository.deleteAllInBatch();
-    cachingDataStore.reset();
+    cachingDataStore.reset(false);
     autoQuarantineRuleRepository.deleteAllInBatch();
   }
 

@@ -208,12 +208,25 @@ public class CachingDataStore {
     return skippedMessages.get(messageHash);
   }
 
-  public void reset() {
-    seenExceptions.clear();
-    messageExceptionReports.clear();
-    messagesToSkip.clear();
-    messagesToPeek.clear();
-    peekedMessages.clear();
+  public void reset(Boolean resetOldMessages) {
+
+    if (resetOldMessages) {
+      for (Entry<ExceptionReport, ExceptionStats> item : seenExceptions.entrySet()) {
+        Long timeDifference =
+            Instant.now().getEpochSecond() - item.getValue().getLastSeen().getEpochSecond();
+
+        if (timeDifference > 300) {
+          seenExceptions.remove(item.getKey());
+          messageExceptionReports.remove(item.getKey().getMessageHash());
+        }
+      }
+    } else {
+      seenExceptions.clear();
+      messageExceptionReports.clear();
+      messagesToSkip.clear();
+      messagesToPeek.clear();
+      peekedMessages.clear();
+    }
   }
 
   public void addQuarantineRuleExpression(

@@ -48,7 +48,7 @@ public class AdminEndpointIT {
   public void setUp() {
     quarantinedMessageRepository.deleteAllInBatch();
     rabbitQueueHelper.purgeQueue(TEST_QUEUE_NAME);
-    cachingDataStore.reset();
+    cachingDataStore.reset(false);
   }
 
   @Test

@@ -153,8 +153,9 @@ public class AdminEndpoint {
   }
 
   @GetMapping(path = "/reset")
-  public void reset() {
-    cachingDataStore.reset();
+  public void reset(
+      @RequestParam(value = "resetOldMessages", required = false) boolean resetOldMessages) {
+    cachingDataStore.reset(resetOldMessages);
   }
 
   @GetMapping(path = "/quarantinerule")
