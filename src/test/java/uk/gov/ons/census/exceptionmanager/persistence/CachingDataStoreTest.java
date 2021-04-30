@@ -408,7 +408,7 @@ public class CachingDataStoreTest {
             .get("test message hash")
             .contains(List.of(skippedMessage)));
 
-    underTest.reset(false);
+    underTest.reset(java.util.Optional.empty());
 
     assertThat(underTest.getSkippedMessages("test message hash")).contains(skippedMessage);
     assertThat(

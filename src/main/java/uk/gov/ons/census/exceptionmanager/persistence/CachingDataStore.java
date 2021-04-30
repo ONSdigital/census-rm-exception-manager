@@ -4,14 +4,8 @@ import com.godaddy.logging.Logger;
 import com.godaddy.logging.LoggerFactory;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.expression.EvaluationContext;
@@ -208,14 +202,13 @@ public class CachingDataStore {
     return skippedMessages.get(messageHash);
   }
 
-  public void reset(Boolean resetOldMessages) {
+  public void reset(Optional<Integer> resetOldMessages) {
 
-    if (resetOldMessages) {
+    if (resetOldMessages.isPresent()) {
       for (Entry<ExceptionReport, ExceptionStats> item : seenExceptions.entrySet()) {
-        Long timeDifference =
-            Instant.now().getEpochSecond() - item.getValue().getLastSeen().getEpochSecond();
+        Instant timeCutoff = Instant.now().minusSeconds(resetOldMessages.get());
 
-        if (timeDifference > 300) {
+        if (timeCutoff.isAfter(item.getValue().getLastSeen())) {
           seenExceptions.remove(item.getKey());
           messageExceptionReports.remove(item.getKey().getMessageHash());
         }
