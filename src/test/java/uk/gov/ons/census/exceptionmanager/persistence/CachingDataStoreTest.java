@@ -449,13 +449,42 @@ public class CachingDataStoreTest {
     exceptionReportTwo.setQueue("test queue");
     exceptionReportTwo.setService("test service");
     underTest.updateStats(exceptionReportTwo);
-    underTest.updateStats(exceptionReportTwo);
-    underTest.updateStats(exceptionReportTwo);
-    underTest.updateStats(exceptionReportTwo);
     underTest.reset(Optional.of(0));
 
     assertThat(underTest.getBadMessageReports("test message hash")).isEmpty();
     assertThat(underTest.getBadMessageReports("test message hash")).isEmpty();
+  }
+
+  @Test
+  public void testResetDoesNotRemoveMessages() {
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
+
+    ExceptionReport exceptionReportOne = new ExceptionReport();
+    exceptionReportOne.setMessageHash("test message hash");
+    exceptionReportOne.setExceptionClass("test class");
+    exceptionReportOne.setExceptionMessage("test exception message");
+    exceptionReportOne.setQueue("test queue");
+    exceptionReportOne.setService("test service");
+
+    underTest.updateStats(exceptionReportOne);
+    underTest.skipMessage("test message hash");
+
+    ExceptionReport exceptionReportTwo = new ExceptionReport();
+    exceptionReportTwo.setMessageHash("another test message hash");
+    exceptionReportTwo.setExceptionClass("test class");
+    exceptionReportTwo.setExceptionMessage("test exception message");
+    exceptionReportTwo.setQueue("test queue");
+    exceptionReportTwo.setService("test service");
+    underTest.updateStats(exceptionReportTwo);
+
+    underTest.reset(Optional.of(1000));
+
+    assertThat(underTest.getBadMessageReports("test message hash")).isNotEmpty();
+
+    assertThat(underTest.getBadMessageReports("another test message hash")).isNotEmpty();
   }
 
   @Test
