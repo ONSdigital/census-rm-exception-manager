@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
@@ -423,6 +424,38 @@ public class CachingDataStoreTest {
     assertThat(underTest.getBadMessageReports("test message hash")).isEmpty();
     assertThat(underTest.getAllSkippedMessages()).isNotEmpty();
     assertThat(underTest.getAllSkippedMessages()).isNotEmpty();
+  }
+
+  @Test
+  public void testResetUnseenMessages() {
+    AutoQuarantineRuleRepository autoQuarantineRuleRepository =
+        mock(AutoQuarantineRuleRepository.class);
+    when(autoQuarantineRuleRepository.findAll()).thenReturn(Collections.emptyList());
+    CachingDataStore underTest = new CachingDataStore(autoQuarantineRuleRepository, 0);
+
+    ExceptionReport exceptionReportOne = new ExceptionReport();
+    exceptionReportOne.setMessageHash("test message hash");
+    exceptionReportOne.setExceptionClass("test class");
+    exceptionReportOne.setExceptionMessage("test exception message");
+    exceptionReportOne.setQueue("test queue");
+    exceptionReportOne.setService("test service");
+
+    underTest.updateStats(exceptionReportOne);
+
+    ExceptionReport exceptionReportTwo = new ExceptionReport();
+    exceptionReportTwo.setMessageHash("another test message hash");
+    exceptionReportTwo.setExceptionClass("test class");
+    exceptionReportTwo.setExceptionMessage("test exception message");
+    exceptionReportTwo.setQueue("test queue");
+    exceptionReportTwo.setService("test service");
+    underTest.updateStats(exceptionReportTwo);
+    underTest.updateStats(exceptionReportTwo);
+    underTest.updateStats(exceptionReportTwo);
+    underTest.updateStats(exceptionReportTwo);
+    underTest.reset(Optional.of(0));
+
+    assertThat(underTest.getBadMessageReports("test message hash")).isEmpty();
+    assertThat(underTest.getBadMessageReports("test message hash")).isEmpty();
   }
 
   @Test
