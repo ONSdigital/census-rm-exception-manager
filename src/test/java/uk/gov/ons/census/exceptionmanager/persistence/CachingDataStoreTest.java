@@ -452,7 +452,7 @@ public class CachingDataStoreTest {
     underTest.reset(Optional.of(0));
 
     assertThat(underTest.getBadMessageReports("test message hash")).isEmpty();
-    assertThat(underTest.getBadMessageReports("test message hash")).isEmpty();
+    assertThat(underTest.getBadMessageReports("another test message hash")).isEmpty();
   }
 
   @Test
