@@ -193,10 +193,10 @@ public class AdminEndpointTest {
     AdminEndpoint underTest = new AdminEndpoint(cachingDataStore, 500, null, null);
 
     // When
-    underTest.reset();
+    underTest.reset(Optional.empty());
 
     // Then
-    verify(cachingDataStore).reset();
+    verify(cachingDataStore).reset(Optional.empty());
   }
 
   @Test

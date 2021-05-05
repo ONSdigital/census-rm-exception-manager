@@ -153,8 +153,10 @@ public class AdminEndpoint {
   }
 
   @GetMapping(path = "/reset")
-  public void reset() {
-    cachingDataStore.reset();
+  public void reset(
+      @RequestParam(value = "lastSeenCutoffSeconds", required = false)
+          Optional<Integer> lastSeenCutoffSeconds) {
+    cachingDataStore.reset(lastSeenCutoffSeconds);
   }
 
   @GetMapping(path = "/quarantinerule")

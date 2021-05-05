@@ -7,11 +7,7 @@ import static uk.gov.ons.census.exceptionmanager.endpoint.ReportingEndpointIT.re
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -48,7 +44,7 @@ public class AdminEndpointIT {
   public void setUp() {
     quarantinedMessageRepository.deleteAllInBatch();
     rabbitQueueHelper.purgeQueue(TEST_QUEUE_NAME);
-    cachingDataStore.reset();
+    cachingDataStore.reset(Optional.empty());
   }
 
   @Test
