@@ -26,8 +26,9 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-pmd-plugin</artifactId>
-        <version>3.21.2</version>
+        <version>3.23.0</version>
         <configuration>
+          <targetJdk>21</targetJdk>
           <excludeFromFailureFile>exclude-pmd.properties</excludeFromFailureFile>
           <failurePriority>3</failurePriority>
           <failOnViolation>true</failOnViolation>
